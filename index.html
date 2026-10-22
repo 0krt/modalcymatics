@@ -550,8 +550,10 @@
   .pin-btn:hover { color: var(--ink-dim); }
   .pin-btn[aria-pressed="true"] { color: var(--accent); }
 
+  /* the dock is the bottom row of the plate view: it sits at the foot of the
+     window, the plate is fitted above it, and the status line moves up over it */
   .pin-dock {
-    position: fixed; left: 22px; right: calc(var(--panel-w) + 22px); bottom: 42px; z-index: 6;
+    position: fixed; left: 22px; right: calc(var(--panel-w) + 22px); bottom: 10px; z-index: 6;
     display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 16px;
     padding: 9px 12px; background: var(--panel); backdrop-filter: blur(10px);
     border: 1px solid var(--line-strong); border-radius: 4px; font-size: 10.5px; transition: right 0.25s ease;
@@ -564,6 +566,9 @@
   .dk-v { margin-left: auto; color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; text-transform: none; }
   .dk-x { background: none; border: 0; color: var(--ink-dim); cursor: pointer; padding: 0 2px; font-size: 11px; min-width: 0; min-height: 0; opacity: 0; }
   .dk:hover .dk-x, .dk-x:focus-visible { opacity: 1; }
+  body.has-dock #status { bottom: calc(var(--dock-h, 0px) + 10px); padding-bottom: 6px; }
+  /* a star on a button group or toggle row, beside its midi button */
+  .midi-wrap > .pin-btn { align-self: center; }
 
   /* the status line doubles as a set of editors */
   #status .st-item {
@@ -573,7 +578,7 @@
   }
   #status .st-item:hover, #status .st-item.open { color: var(--accent); background: rgba(13, 15, 21, 0.75); }
   .st-pop {
-    position: fixed; left: 22px; bottom: calc(42px + var(--dock-h, 0px) + 10px); z-index: 12; width: 250px;
+    position: fixed; left: 22px; bottom: calc(var(--dock-h, 0px) + 46px); z-index: 12; width: 250px;
     display: grid; gap: 8px; padding: 10px 12px; background: rgb(17, 20, 27);
     border: 1px solid var(--control-border); border-radius: 4px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55); font-size: 11px;
   }
@@ -848,6 +853,12 @@
       <div class="toolrow">
         <button class="tool active" id="btn-evenfeed">even feed</button>
       </div>
+      <div class="sublabel">momentary · hold the plate</div>
+      <div class="toolrow" id="momentary">
+        <button class="tool active" data-mom="0">off</button>
+        <button class="tool" data-mom="1">fade</button>
+        <button class="tool" data-mom="2">noise</button>
+      </div>
       <div class="btnrow">
         <button class="act" id="btn-reseed">scatter grains</button>
       </div>
@@ -863,6 +874,14 @@
         freshly scattered grains sweeps through the sand first and the powder after it, so each
         figure blurs and sharpens in turn, once per turnover — a beat at the feed rate, most obvious
         with feed high. switch it off to get that sweep back.<br><br>
+        <b>momentary</b> makes the plate an instrument you hold: it only sounds, and the grains only
+        move, while the pointer is down on it (or a midi note is held). <b>fade</b> shows
+        nothing at rest — let go and the plate stops being fed and its grains are taken off,
+        oldest first, at <b>feed rate</b> plus <b>kill rate</b> of the population per second, so a
+        sum of 4 clears it in a quarter of a second. press again and they land as a fresh sprinkle.
+        <b>noise</b> keeps the grains, but on release sprinkles them back, at the same rate,
+        onto a maximally even spread — as if a burst of noise had shaken the figure out — ready
+        for the next press to draw it again. <b>m</b> steps through the three.<br><br>
         <b>hop threshold</b> is the local amplitude a grain needs before it will move at all — real sand
         only migrates once the plate's acceleration beats gravity. <b>jitter</b> is random bouncing,
         scaled by the local amplitude, so it competes with the crawl and fuzzes the lines.
@@ -1015,13 +1034,13 @@
       <h2>Keys <span class="tag"></span><button class="infobtn" data-info="i-keys">i</button></h2>
       <div class="hint open" id="i-keys">
         <b>/</b> or <b>ctrl-k</b> find any parameter — ↵ jumps to it in the panel<br>
-      <b>space</b> pause · <b>r</b> scatter grains · <b>g</b> randomize<br>
+      <b>space</b> pause · <b>r</b> scatter grains · <b>g</b> randomize · <b>m</b> momentary mode<br>
         <b>d</b> grains · <b>f</b> field mode · <b>s</b> png · <b>v</b> record · <b>h</b> panel<br><br>
         <b>drag</b> the plate to move the driver · <b>shift-click</b> to pin a damping finger<br>
         <b>scroll</b> to sweep the frequency · <b>double-click</b> any slider to reset it<br><br>
         <b>click</b> a section title to fold it away — the panel remembers what you closed<br>
       <b>double-click</b> a value read-out to type an exact number<br>
-      <b>☆</b> beside a parameter pins it to a dock over the plate (up to eight, saved in exported patches)<br>
+      <b>☆</b> beside a parameter pins it to a row under the plate (up to eight, saved in exported patches)<br>
       <b>click</b> an item in the status line to edit it in place<br><br>
         <b>click</b> a parameter row to select it, then <b>↑ / ↓</b> to step it — hold
         <b>shift</b> for ten notches at a time. <b>↑ / ↓</b> on a dropdown jumps
@@ -1520,6 +1539,8 @@ const DRIVEPT_PARAMS = [
 const GRAIN_PARAMS = [
   { id: 'grains', label: 'count',         min: 0,   max: 80000, step: 1000,  value: 80000, dp: 0 },
   { id: 'feed',   label: 'feed rate',     min: 0,   max: 1,     step: 0.002, value: 1,     dp: 3 },
+  // how fast a momentary mode clears the plate once you let go, on top of the feed
+  { id: 'kill',   label: 'kill rate',     min: 0,   max: 8,     step: 0.02,  value: 2,     dp: 2, unit: '/s' },
   { id: 'crawl',  label: 'crawl rate',    min: 0,   max: 0.4,   step: 0.002, value: 0.2,   dp: 3 },
   { id: 'hop',    label: 'hop threshold', min: 0,   max: 0.25,  step: 0.002, value: 0.05,  dp: 3 },
   { id: 'jitter', label: 'jitter',        min: 0,   max: 1,     step: 0.005, value: 0.15,  dp: 3 },
@@ -2041,6 +2062,27 @@ const feedAcc = [0, 0], feedPtr = [0, 0];   // one rolling recycle cursor per po
    both at the same point in their cycle, so neither breathes. */
 let evenFeed = true;
 
+/* momentary modes. the plate only sounds, and the grains only move, while it
+   is held — the pointer down on it, or a midi note. let go and it falls silent:
+     1 fade  — the plate stops being fed and the grains are taken off it, at the
+               feed rate plus the kill rate, until it is bare
+     2 noise — the grains are sprinkled back over it, at the same rate, onto a
+               maximally even spread, as if a burst of white noise had shaken
+               the figure out
+   presence is the fraction of each population on the plate; the rest are kept
+   but neither moved nor drawn. */
+let momentary = 0, held = false, presence = 1, lastPresence = 1;
+let pointerHeld = false;
+const notesHeld = new Set();
+let evenPtr = 0, evenAcc = 0;
+function gateOpen() { return !momentary || held; }
+function setHeld() {
+  const h = pointerHeld || notesHeld.size > 0;
+  if (h === held) return;
+  held = h;
+  updateAudio();
+}
+
 // one array, two populations — the split is an index, so nothing per-grain is stored
 function splitGrains() {
   nCoarse = medium === 'sand'   ? grainCount
@@ -2081,10 +2123,20 @@ function stepGrains(dt) {
     grainCount = n;
   }
   if (!grainCount) return;
+  splitGrains();
+
+  const live = gateOpen();
+  presence = momentary !== 1 || live ? 1 : Math.max(0, presence - (P.feed + P.kill) * dt);
+  // grains coming back after a fade land as a fresh sprinkle, not where they left
+  if (presence > lastPresence) revive(lastPresence, presence);
+  lastPresence = presence;
+  if (!live) {                   // silent plate: nothing crawls
+    if (momentary === 2) evenOut(dt);
+    return;
+  }
 
   // continuous feed: recycle grains back onto the plate oldest-first, so the
   // population keeps turning over instead of settling once and freezing
-  splitGrains();
   if (P.feed > 0) {
     if (evenFeed) {
       recycleRange(0, nCoarse, 0, dt);
@@ -2095,6 +2147,68 @@ function stepGrains(dt) {
   }
   if (nCoarse > 0) moveGrains(0, nCoarse, -1, dt);
   if (grainCount > nCoarse) moveGrains(nCoarse, grainCount, 1, dt);
+}
+
+function revive(from, to) {
+  const nF = grainCount - nCoarse;
+  for (let i = Math.round(from * nCoarse); i < Math.round(to * nCoarse); i++) placeGrain(i);
+  for (let i = Math.round(from * nF); i < Math.round(to * nF); i++) placeGrain(nCoarse + i);
+}
+// how many of each population are on the plate and drawn
+function shownCoarse() { return Math.round(presence * nCoarse); }
+function shownFine()   { return Math.round(presence * (grainCount - nCoarse)); }
+
+/* the even spread: the R2 low-discrepancy sequence (Roberts' generalised golden
+   ratio) over the plate's box, keeping the points that land on the plate. any
+   run of it is as evenly spread as a run can be, so grain i takes point i and
+   both populations come out even, apart and together. a small jitter breaks
+   the quasi-lattice up so it never moirés against the pixel grid. */
+let evenTab = null, evenKey = '';
+function ensureEven(n) {
+  const inner = ringInner();
+  const key = geom + ':' + inner.toFixed(4) + ':' + n;
+  if (key === evenKey) return;
+  evenKey = key;
+  if (!evenTab) evenTab = new Float32Array(MAXGRAINS * 2);
+  const round = geom === 'disc' || geom === 'ring', tri = geom === 'tri';
+  const inside = (x, y) => {
+    if (round) { const r = Math.hypot(x * 2 - 1, y * 2 - 1); return r <= 0.99 && r >= inner * 1.01; }
+    if (tri) return y >= 0 && 2 * x - y >= 0 && 2 * x + y <= 2;
+    return x >= 0 && x <= 1 && y >= 0 && y <= 1;
+  };
+  const area = round ? Math.PI / 4 * (0.98 - inner * inner) : tri ? 0.5 : 1;
+  const jit = 0.3 * Math.sqrt(area / Math.max(1, n));
+  const a1 = 0.7548776662466927, a2 = 0.5698402909980532;   // 1/g, 1/g² for g³ = g + 1
+  let k = 0;
+  for (let i = 0; i < n; ) {
+    k++;
+    const x = (0.5 + a1 * k) % 1, y = (0.5 + a2 * k) % 1;
+    if (!inside(x, y)) continue;
+    let jx = x + (Math.random() - 0.5) * 2 * jit, jy = y + (Math.random() - 0.5) * 2 * jit;
+    if (!inside(jx, jy)) { jx = x; jy = y; }
+    evenTab[i * 2] = jx; evenTab[i * 2 + 1] = jy;
+    i++;
+  }
+}
+// released in noise mode: a cursor walks the population putting each grain on
+// its even spot, a whole turnover every 1 / (feed + kill) seconds
+function evenOut(dt) {
+  ensureEven(grainCount);
+  evenAcc += (P.feed + P.kill) * grainCount * dt;
+  const whole = Math.min(grainCount, Math.floor(evenAcc));
+  evenAcc -= whole;
+  if (evenAcc > grainCount) evenAcc = 0;
+  for (let j = 0; j < whole; j++) {
+    const i = evenPtr++ % grainCount;
+    gpos[i * 2] = evenTab[i * 2]; gpos[i * 2 + 1] = evenTab[i * 2 + 1];
+  }
+  evenPtr %= grainCount;
+}
+function setMomentary(m) {
+  momentary = m;
+  evenAcc = 0;
+  document.querySelectorAll('[data-mom]').forEach(x => x.classList.toggle('active', +x.dataset.mom === m));
+  updateAudio(); updateTags();
 }
 
 // recycle one population's share of grains, oldest first within that population
@@ -2228,6 +2342,8 @@ function resize() {
 // keep in step with --panel-w in the stylesheet
 const PANEL_W = parseFloat(getComputedStyle(document.documentElement)
                   .getPropertyValue('--panel-w')) || 322;
+// css px the pinned-controls row takes off the foot of the view (0 with no pins)
+let dockReserve = 0;
 
 function computeFrame() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -2235,14 +2351,16 @@ function computeFrame() {
   const panelW = (capturing || document.body.classList.contains('panel-hidden')) ? 0 : PANEL_W * dpr;
   // a window narrower than the panel (or a backgrounded tab reporting zero)
   // would otherwise give a negative frame — and a negative gl.scissor
-  const availW = Math.max(1, W - panelW), availH = Math.max(1, H);
+  // the dock is a row of the view, not a lid on it: the plate is fitted above it
+  const dockH = capturing ? 0 : Math.min(H * 0.5, dockReserve * dpr);
+  const availW = Math.max(1, W - panelW), availH = Math.max(1, H - dockH);
   const a = capturing ? 0 : aspectValue();
   let fw = availW, fh = availH;
   if (a > 0) {
     fw = Math.min(availW, availH * a);
     fh = fw / a;
   }
-  frame_ = [Math.round((availW - fw) / 2), Math.round((availH - fh) / 2), Math.round(fw), Math.round(fh)];
+  frame_ = [Math.round((availW - fw) / 2), Math.round(dockH + (availH - fh) / 2), Math.round(fw), Math.round(fh)];
 
   // the rectangle stretches to its aspect ratio; the triangle's box is 1 : √3/2
   // so it renders equilateral; everything else is square-boxed
@@ -2371,18 +2489,19 @@ function frame(now) {
     const dprEff = capturing ? (H / Math.max(1, innerHeight)) : Math.min(window.devicePixelRatio || 1, 2);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    if (nCoarse > 0) {
+    const sc = shownCoarse(), sf = shownFine();
+    if (sc > 0) {
       const gc = coarseRgb();
       gl.uniform1f(uP.uSize, P.gsize * dprEff);
       gl.uniform3f(uP.uColor, gc[0], gc[1], gc[2]);
-      gl.drawArrays(gl.POINTS, 0, nCoarse);
+      gl.drawArrays(gl.POINTS, 0, sc);
     }
-    if (grainCount > nCoarse) {
+    if (sf > 0) {
       // real powder is finer than the sand it shares the plate with
       const fc = fineRgb();
       gl.uniform1f(uP.uSize, Math.max(1, P.gsize * 0.65) * dprEff);
       gl.uniform3f(uP.uColor, fc[0], fc[1], fc[2]);
-      gl.drawArrays(gl.POINTS, nCoarse, grainCount - nCoarse);
+      gl.drawArrays(gl.POINTS, nCoarse, sf);
     }
     gl.disable(gl.BLEND);
   }
@@ -2820,7 +2939,7 @@ function updateTags() {
   document.getElementById('plate-tag').textContent = GEOM_LABEL[geom] + ' · ' + edge;
   document.getElementById('drive-tag').textContent = spec.length + 'p · ' + fmtHz(P.freq * hzPerUnit());
   document.getElementById('mode-tag').textContent = active.length + ' active';
-  document.getElementById('grain-tag').textContent = medium;
+  document.getElementById('grain-tag').textContent = medium + (momentary ? ' · hold' : '');
   const ft = document.getElementById('finger-tag');
   if (ft) ft.textContent = fingers.length ? '(' + fingers.length + ')' : '';
 }
@@ -2975,6 +3094,7 @@ canvas.addEventListener('pointerdown', e => {
   if (x < -0.1 || x > 1.1 || y < -0.1 || y > 1.1) return;
   if (e.shiftKey) { toggleFinger(Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))); return; }
   dragging = true; canvas.setPointerCapture(e.pointerId);
+  pointerHeld = true; setHeld();
   setParam('dx', Math.min(1, Math.max(0, x)));
   setParam('dy', Math.min(1, Math.max(0, y)));
 });
@@ -2998,7 +3118,10 @@ canvas.addEventListener('pointermove', e => {
   setParam('dx', Math.min(1, Math.max(0, x)));
   setParam('dy', Math.min(1, Math.max(0, y)));
 });
-canvas.addEventListener('pointerup', e => { dragging = false; canvas.releasePointerCapture(e.pointerId); });
+function releasePlate() { dragging = false; pointerHeld = false; setHeld(); }
+canvas.addEventListener('pointerup', e => { releasePlate(); canvas.releasePointerCapture(e.pointerId); });
+canvas.addEventListener('pointercancel', releasePlate);
+canvas.addEventListener('lostpointercapture', releasePlate);
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   if (snapOn && modeFreqs.length) {
@@ -3109,6 +3232,7 @@ document.querySelectorAll('[data-edge]').forEach(b => b.addEventListener('click'
 document.querySelectorAll('[data-disp]').forEach(b => b.addEventListener('click', () => setDisp(b.dataset.disp)));
 document.querySelectorAll('[data-med]').forEach(b => b.addEventListener('click', () => setMedium(b.dataset.med)));
 document.getElementById('btn-evenfeed').addEventListener('click', () => setEvenFeed(!evenFeed));
+document.querySelectorAll('[data-mom]').forEach(b => b.addEventListener('click', () => setMomentary(parseInt(b.dataset.mom, 10))));
 document.querySelectorAll('[data-field]').forEach(b => b.addEventListener('click', () => setField(parseInt(b.dataset.field, 10))));
 document.getElementById('material').addEventListener('change', e => setMaterial(e.target.value));
 
@@ -3277,7 +3401,7 @@ function snapshotPatch() {
     saved: new Date().toISOString(),
     plate:  { geom, edge, disp, material },
     drive:  { waveform, snap: snapOn },
-    grains: { medium, evenFeed },
+    grains: { medium, evenFeed, momentary },
     render: { field: fieldMode, palette, grains: showGrains, driver: showDrive, canvas: colCanvas },
     audio:  { realHz },
     frame:  { aspect: document.getElementById('aspect').value,
@@ -3346,6 +3470,7 @@ function applyPatch(s) {
   if (rn.field === 0 || rn.field === 1 || rn.field === 2) setField(rn.field);
   if (MED_KEYS.includes(gr.medium)) setMedium(gr.medium);
   if (typeof gr.evenFeed === 'boolean') setEvenFeed(gr.evenFeed);
+  if ([0, 1, 2].includes(gr.momentary)) setMomentary(gr.momentary);
 
   fingers = Array.isArray(s.fingers)
     ? s.fingers.filter(f => f && Number.isFinite(f.x) && Number.isFinite(f.y)).slice(0, 4)
@@ -3485,6 +3610,8 @@ MAP_TARGETS['_med3'] = { label: 'medium (sand / powder / both)', steps: ['sand',
   apply: i => { const m = ['sand', 'powder', 'both'][i]; if (m !== medium) setMedium(m); } };
 MAP_TARGETS['_field'] = { label: 'field (off / motion / rms)', steps: ['0', '1', '2'],
   apply: i => { if (i !== fieldMode) setField(i); } };
+MAP_TARGETS['_momentary'] = { label: 'momentary (off / fade / noise)', steps: ['0', '1', '2'],
+  apply: i => { if (i !== momentary) setMomentary(i); } };
 
 MAP_TARGETS['_medium'] = { label: 'medium (sand / powder)', toggle: true,
   apply: on => setMedium(on ? 'powder' : 'sand') };
@@ -3567,6 +3694,11 @@ function onMidiMessage(e, inputId) {
     ' <b>' + d1 + '</b> = <b>' + d2 + '</b>';
   flashMidi();
 
+  // in a momentary mode any held note holds the plate
+  if (type === 0x90 || type === 0x80) {
+    if (type === 0x90 && d2 > 0) notesHeld.add(d1); else notesHeld.delete(d1);
+    setHeld();
+  }
   // note on walks the plate's own ladder of resonances, a rung per semitone
   if (midiNotes && (type === 0x90 || type === 0x80)) {
     if (type === 0x80 || d2 === 0) return;                      // note off holds the figure
@@ -3768,7 +3900,7 @@ function renderMapList() {
 // group of buttons docks the button on the whole group.
 const MIDI_BTN_AT = {
   _geom: '#geom', _material: '#material', _edge: '[data-edge]', _disp: '[data-disp]',
-  _field: '#fieldmode', _med3: '[data-med]',
+  _field: '#fieldmode', _med3: '[data-med]', _momentary: '#momentary',
   _grains: '#btn-grains', _driver: '#btn-driver', _pause: '#btn-pause', _snap: '#btn-snap',
   _realhz: '#btn-realhz', _notes: '#btn-midinotes', _scatter: '#btn-reseed', _fingers: '#btn-clearfingers',
 };
@@ -3928,7 +4060,8 @@ function updateAudio() {
   if (tag) tag.textContent = audioOn ? audioHz().toFixed(0) + ' hz' : '';
   if (!actx || !osc) return;
   osc.frequency.setTargetAtTime(audioHz(), actx.currentTime, 0.02);
-  gainNode.gain.setTargetAtTime(audioOn ? P.vol * 0.3 : 0, actx.currentTime, 0.03);
+  // a momentary mode only lets the tone through while the plate is held
+  gainNode.gain.setTargetAtTime(audioOn && gateOpen() ? P.vol * 0.3 : 0, actx.currentTime, 0.03);
 }
 
 function toggleAudio() {
@@ -4055,6 +4188,7 @@ addEventListener('keydown', e => {
   else if (k === 's') document.getElementById('btn-png').click();
   else if (k === 'v') btnRec.click();
   else if (k === 'h') document.getElementById('paneltoggle').click();
+  else if (k === 'm') setMomentary((momentary + 1) % 3);
 });
 
 /* ---- boot ---- */
@@ -4249,9 +4383,11 @@ requestAnimationFrame(frame);
   const STEP_READ = {
     _geom: () => GEOM_STEPS.indexOf(geom), _edge: () => EDGE_STEPS.indexOf(edge), _disp: () => DISP_STEPS.indexOf(disp),
     _material: () => MAT_KEYS.indexOf(material), _med3: () => ['sand', 'powder', 'both'].indexOf(medium), _field: () => fieldMode,
+    _momentary: () => momentary,
   };
   const STEP_LABEL = {
     _geom: i => GEOM_LABEL[GEOM_STEPS[i]] || GEOM_STEPS[i], _field: i => FIELD_NAMES[i],
+    _momentary: i => ['off', 'fade', 'noise'][i],
     _material: i => (MATERIALS[MAT_KEYS[i]] && MATERIALS[MAT_KEYS[i]].label) || MAT_KEYS[i],
     _edge: i => ({ supported: 'supp.', clamped: 'clamp', mixed: 'mixed', free: 'free' }[EDGE_STEPS[i]] || EDGE_STEPS[i]),
   };
@@ -4288,7 +4424,7 @@ requestAnimationFrame(frame);
   // where each target's own control lives in the panel
   const TARGET_CONTROL = {
     _geom: '#geom', _edge: '[data-edge]', _disp: '[data-disp]', _material: '#material', _med3: '[data-med]', _medium: '[data-med]',
-    _field: '[data-field]', _grains: '#btn-grains', _pause: '#btn-pause', _snap: '#btn-snap', _realhz: '#btn-realhz',
+    _field: '[data-field]', _momentary: '[data-mom]', _grains: '#btn-grains', _pause: '#btn-pause', _snap: '#btn-snap', _realhz: '#btn-realhz',
     _notes: '#btn-midinotes', _driver: '#btn-driver', _scatter: '#btn-reseed', _fingers: '#btn-clearfingers',
   };
   function controlFor(k) {
@@ -4403,9 +4539,17 @@ requestAnimationFrame(frame);
     });
     dock.hidden = !pinned.length;
     document.body.classList.toggle('has-dock', pinned.length > 0);
-    document.body.style.setProperty('--dock-h', (dock.offsetHeight || 0) + 'px');
+    fitDock();
   }
-  // a star on every slider row
+  // the plate makes room for the dock and the status line above it
+  function fitDock() {
+    const h = dock.hidden ? 0 : dock.offsetHeight || 0;
+    document.body.style.setProperty('--dock-h', h + 'px');
+    const reserve = h ? h + 10 + 30 : 0;
+    if (reserve !== dockReserve) { dockReserve = reserve; computeFrame(); }
+  }
+  // a star on every slider row, and beside the midi button of every toggle,
+  // button group and lfo control the registry covers
   function addPinButtons() {
     document.querySelectorAll('#panel .param[id^="param-"]').forEach(row => {
       const k = row.id.slice(6);
@@ -4413,6 +4557,16 @@ requestAnimationFrame(frame);
       if (!MAP_TARGETS[k] || !r1 || r1.querySelector('.pin-btn')) return;
       r1.insertBefore(pinButton(k), r1.querySelector('.midi-btn') || r1.querySelector('.val'));
     });
+    document.querySelectorAll('#panel .midi-btn').forEach(mb => {
+      const k = mb.dataset.midi;
+      if (!MAP_TARGETS[k] || TRIGGERS.has(k) || paramById[k] || document.querySelector('#panel .pin-btn[data-pin="' + k + '"]')) return;
+      mb.before(pinButton(k));
+    });
+  }
+  // the lfo panel is rebuilt whole; its stars come back with its midi buttons
+  {
+    const amb = addMidiButtons;
+    addMidiButtons = function () { const r = amb.apply(this, arguments); addPinButtons(); return r; };
   }
   // patches carry their pins; the built-in presets leave them alone
   {
@@ -4424,7 +4578,7 @@ requestAnimationFrame(frame);
   /* ---- the status line as editors ---- */
   const ST_KEYS = {
     f: ['freq', '_snap'], q: ['q'], drive: ['dx', 'dy', 'finger'], dominant: ['freq', 'q', 'partials'],
-    grains: ['grains', 'feed', 'crawl', 'jitter'],
+    grains: ['grains', 'feed', 'kill', '_momentary', 'crawl', 'jitter'],
   };
   const stPop = document.getElementById('st-pop');
   let stOpen = null, lastStatus = '';
@@ -4437,7 +4591,7 @@ requestAnimationFrame(frame);
       ' · ' + item('q', P.q.toFixed(0)) +
       ' · ' + item('drive', P.dx.toFixed(2) + ',' + P.dy.toFixed(2)) +
       ' · ' + item('dominant', esc(top)) +
-      ' · ' + item('grains', grainCount) +
+      ' · ' + item('grains', shownCoarse() + shownFine()) +
       (paused ? ' · <span class="paused">paused</span>' : '');
     if (html !== lastStatus) { el.innerHTML = html; lastStatus = html; }
   };
@@ -4666,7 +4820,9 @@ requestAnimationFrame(frame);
   renderDock();
   syncWave();
   drawStatus();
-  addEventListener('resize', () => document.body.style.setProperty('--dock-h', (dock.offsetHeight || 0) + 'px'));
+  addEventListener('resize', fitDock);
+  // the dock rewraps when the panel slides in or out
+  if (window.ResizeObserver) new ResizeObserver(fitDock).observe(dock);
 })();
 </script>
 
