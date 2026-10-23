@@ -847,6 +847,45 @@
   </div>
 
   <div class="tab-panel" id="tab-sand" data-tab="sand" role="tabpanel" aria-labelledby="tabbtn-sand">
+    <div class="section" id="sec-style">
+      <h2>Style <span class="tag" id="style-tag"></span><button class="infobtn" data-info="i-style">i</button></h2>
+      <div class="toolrow" id="stylemode">
+        <button class="tool active" data-style="grains">grains</button>
+        <button class="tool" data-style="smooth">smooth</button>
+        <button class="tool" data-style="liquid">liquid</button>
+      </div>
+      <div class="toolrow" id="smoothsub">
+        <button class="tool active" data-sub="lines">nodal lines</button>
+        <button class="tool" data-sub="density">density</button>
+        <button class="tool" data-sub="contours">contours</button>
+      </div>
+      <div class="toolrow" id="liquidmat">
+        <button class="tool active" data-lmat="chrome">chrome</button>
+        <button class="tool" data-lmat="gloss">gloss</button>
+        <button class="tool" data-lmat="water">water</button>
+      </div>
+      <div id="params-style"></div>
+      <div class="hint" id="i-style">
+        <b>grains</b> is the sand simulation. the other two draw the same time-averaged field
+        directly, per pixel, with no particles — the figure the sand would settle into, at any
+        resolution.<br><br>
+        <b>smooth</b> has three readings of it: <b>nodal lines</b> traces the still curves themselves,
+        <b>density</b> is the settled sand as a continuous glow (<b>softness</b> is how far it
+        spreads off the node), <b>contours</b> draws the amplitude as a topographic map — the nodes
+        bold, the antinodes as nested rings.<br><br>
+        <b>liquid</b> pours a glossy liquid into the nodal channels: <b>fill</b> is how much there is,
+        <b>depth</b> how tall the beads stand, <b>light angle</b> where the key light sits.
+        <b>chrome</b> is a mirror, <b>gloss</b> a tinted resin in the sand colour, <b>water</b> is
+        clear and refracts the ruled plate beneath it.<br><br>
+        <b>morph time</b> makes every change settle the way a real plate does: each mode rings up or
+        down with its own time constant, Q over π times its frequency, so low and sharp modes move
+        slowly and high or damped ones quickly. the slider scales all of them; at zero changes are
+        instant. changing the shape, edge or dispersion swaps the whole set of modes, so those
+        cross-fade over the same time instead. in a momentary mode, letting go lets the figure
+        ring down.
+      </div>
+    </div>
+
     <div class="section" id="sec-grains">
       <h2>Grains <span class="tag" id="grain-tag"></span><button class="infobtn" data-info="i-grain">i</button></h2>
       <div id="params-grain"></div>
@@ -890,7 +929,7 @@
 
     <div class="section" id="sec-render">
       <h2>Rendering <span class="tag"></span><button class="infobtn" data-info="i-render">i</button></h2>
-      <div class="sublabel">field</div>
+      <div class="sublabel" id="sub-field">field</div>
       <div class="toolrow" id="fieldmode">
         <button class="tool active" data-field="0">off</button>
         <button class="tool" data-field="1">motion</button>
@@ -906,8 +945,8 @@
         <button class="tool active" id="btn-grains">grains</button>
         <button class="tool active" id="btn-driver">driver dot</button>
       </div>
-      <div class="sublabel">medium</div>
-      <div class="toolrow grid2">
+      <div class="sublabel" id="sub-medium">medium</div>
+      <div class="toolrow grid2" id="medium-row">
         <button class="tool active" data-med="sand">sand → nodes</button>
         <button class="tool" data-med="powder">powder → anti</button>
         <button class="tool" data-med="both">both at once</button>
@@ -1035,7 +1074,7 @@
       <div class="hint open" id="i-keys">
         <b>/</b> or <b>ctrl-k</b> find any parameter — ↵ jumps to it in the panel<br>
       <b>space</b> pause · <b>r</b> scatter grains · <b>g</b> randomize · <b>m</b> momentary mode<br>
-        <b>d</b> grains · <b>f</b> field mode · <b>s</b> png · <b>v</b> record · <b>h</b> panel<br><br>
+        <b>d</b> grains · <b>f</b> field mode · <b>y</b> style · <b>s</b> png · <b>v</b> record · <b>h</b> panel<br><br>
         <b>drag</b> the plate to move the driver · <b>shift-click</b> to pin a damping finger<br>
         <b>scroll</b> to sweep the frequency · <b>double-click</b> any slider to reset it<br><br>
         <b>click</b> a section title to fold it away — the panel remembers what you closed<br>
@@ -1127,6 +1166,7 @@ function fatal(msg) {
 if (!gl) fatal('webgl2 is not available in this browser.');
 
 const MAXMODES = 96;      // uniform array budget
+const NH       = 8;       // harmonics a drive can carry (the partials ceiling)
 const GRID     = 128;     // cpu rms field resolution
 
 /* ================================================================
@@ -1563,6 +1603,17 @@ const RENDER_PARAMS = [
   { id: 'trails', label: 'trails', min: 0, max: 0.97, step: 0.01, value: 0, dp: 2,
     fmt: v => v < 0.005 ? 'off' : Math.round(v * 100) + '%' },
 ];
+// the particle-free styles
+const STYLE_PARAMS = [
+  { id: 'morph',  label: 'morph time',  min: 0,   max: 4,    step: 0.01, value: 1,    dp: 2,
+    fmt: v => v < 0.005 ? 'instant' : v.toFixed(2) + '×' },
+  { id: 'linew',  label: 'line width',  min: 0.3, max: 8,    step: 0.05, value: 2,    dp: 2, unit: ' px' },
+  { id: 'soft',   label: 'softness',    min: 0.01, max: 0.5, step: 0.002, value: 0.08, dp: 3 },
+  { id: 'levels', label: 'contour levels', min: 2, max: 24,  step: 1,    value: 8,    dp: 0 },
+  { id: 'lfill',  label: 'fill',        min: 0,   max: 1,    step: 0.005, value: 0.5, dp: 3 },
+  { id: 'depth',  label: 'depth',       min: 0.1, max: 4,    step: 0.02, value: 1,    dp: 2 },
+  { id: 'light',  label: 'light angle', min: 0,   max: 360,  step: 1,    value: 125,  dp: 0, unit: '°' },
+];
 const AUDIO_PARAMS = [
   { id: 'vol',    label: 'volume',         min: 0,   max: 1,  step: 0.005, value: 0.35, dp: 3 },
   { id: 'basehz', label: 'pitch per unit', min: 0.5, max: 30, step: 0.05,  value: 8,    dp: 2, unit: ' hz' },
@@ -1587,7 +1638,7 @@ const paramById = {};
 const PB = {};
 let modOffset = {};
 [PLATE_PARAMS, UNIT_PARAMS, DRIVE_PARAMS, DRIVEPT_PARAMS, GRAIN_PARAMS, GRAINCOL_PARAMS,
- RENDER_PARAMS, AUDIO_PARAMS, MIDI_PARAMS, EXPORT_PARAMS]
+ RENDER_PARAMS, STYLE_PARAMS, AUDIO_PARAMS, MIDI_PARAMS, EXPORT_PARAMS]
   .forEach(list => list.forEach(d => { paramById[d.id] = d; P[d.id] = d.value; PB[d.id] = d.value; }));
 
 let geom = 'disc', edge = 'supported', disp = 'plate', waveform = 'sine', medium = 'sand';
@@ -1752,6 +1803,7 @@ function buildCatalogue() {
   for (const m of catalogue) { m.hre = null; m.him = null; m.F0 = m.F; }
   rescaleModes();
   uploadProfiles();
+  styleCatalogueChanged();
 }
 
 /* the catalogue is solved once for the full-frame plate (F0); the on-screen size
@@ -1897,6 +1949,17 @@ function solveModes() {
       tot += Math.hypot(hre, him);
     }
     m.tot = tot;
+    // the same response regrouped by harmonic number — what the smooth styles
+    // morph toward. partials are matched by n, so a waveform change keeps the
+    // fundamental's figure continuous instead of reshuffling it
+    if (!m.tre) { m.tre = new Float32Array(NH); m.tim = new Float32Array(NH); }
+    m.tre.fill(0); m.tim.fill(0);
+    for (let p = 0; p < np; p++) {
+      const n = spec[p].n - 1;
+      if (n < NH) { m.tre[n] += m.hre[p]; m.tim[n] += m.him[p]; }
+    }
+    // ring-up time of a resonator: Q / (π f), in the plate's own frequency units
+    m.tau = Qm / (Math.PI * Math.max(1e-6, m.F));
     if (tot > peak) peak = tot;
   }
 
@@ -2395,13 +2458,600 @@ const uB = {};
 
 const GEOM_ID = { rect: 0, disc: 1, ring: 1, tri: 2 };
 
+/* ================================================================
+   smooth & liquid styles — the field drawn directly, no particles
+
+   the rms field is evaluated per texel on the gpu into a float
+   texture, from modal amplitudes held per harmonic. those amplitudes
+   do not jump to a new solve: each one rings toward its target with
+   the resonator's own time constant, so the figure morphs the way a
+   real plate re-settles. a change of shape, edge or dispersion swaps
+   the whole mode set, and that cross-fades between two snapshots.
+   ================================================================ */
+
+let style = 'grains', smoothSub = 'lines', liqMat = 'chrome';
+const STYLE_KEYS = ['grains', 'smooth', 'liquid'];
+const SUB_KEYS = ['lines', 'density', 'contours'];
+const LMAT_KEYS = ['chrome', 'gloss', 'water'];
+
+// shared glsl: profile lookup, palettes and the per-geometry mode shape
+const GLSL_COMMON = `
+const float PI = 3.14159265359;
+const float TAU3 = 2.09439510239;
+const int PROF_W = ${PROF_W};
+uniform sampler2D uProf;
+uniform int uGeom;
+uniform float uInner;
+float prof(int row, float s) {
+  float t = clamp(s, 0.0, 1.0) * float(PROF_W - 1);
+  int i = int(floor(t));
+  float f = t - float(i);
+  float a = texelFetch(uProf, ivec2(i, row), 0).r;
+  float b = texelFetch(uProf, ivec2(min(i + 1, PROF_W - 1), row), 0).r;
+  return mix(a, b, f);
+}
+float modeShape(vec4 m, vec2 q, float s, float th) {
+  if (uGeom == 1) return prof(int(m.y), s) * cos(m.x * th + m.w);
+  if (uGeom == 2) {
+    float k = m.x, al = m.y;
+    float X = q.x, Y = q.y * ${TRI_H.toFixed(8)};
+    float acc = 0.0;
+    for (int j = 0; j < 6; j++) {
+      float a = (j < 3) ? al + float(j) * TAU3 : -al + float(j - 3) * TAU3;
+      float ph = k * (cos(a) * X + sin(a) * Y);
+      acc += ((j < 3) ? 1.0 : -1.0) * ((m.w > 0.5) ? cos(ph) : sin(ph));
+    }
+    return acc;
+  }
+  return prof(int(m.x), q.x) * prof(int(m.y), q.y);
+}`;
+
+// pass 1: ⟨w²⟩^½ per texel, in plate coordinates
+const FRAG_RMS = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 fragColor;
+uniform vec4  uMode[${MAXMODES}];
+uniform int   uCount;
+uniform int   uNH;
+uniform sampler2D uAmp;     // (re, im) at texel (mode, harmonic)
+uniform float uNorm;
+uniform vec2  uSize;
+uniform int   uEnc;         // 1: 8-bit target, store sqrt for precision near the nodes
+uniform int   uLineN;       // harmonic whose standing wave draws the nodal lines
+uniform vec2  uLinePh;      // (cos φ, sin φ) of its principal phase
+${GLSL_COMMON}
+void main() {
+  vec2 q = gl_FragCoord.xy / uSize;
+  float th = 0.0, s = 0.0;
+  if (uGeom == 1) {
+    vec2 c = q * 2.0 - 1.0;
+    float r = min(length(c), 1.0);
+    th = atan(c.y, c.x);
+    s = clamp((r - uInner) / max(1e-6, 1.0 - uInner), 0.0, 1.0);
+  }
+  vec2 acc[${NH}];
+  for (int n = 0; n < ${NH}; n++) acc[n] = vec2(0.0);
+  for (int i = 0; i < uCount; i++) {
+    float w = modeShape(uMode[i], q, s, th);
+    for (int n = 0; n < ${NH}; n++) {
+      if (n >= uNH) break;
+      acc[n] += texelFetch(uAmp, ivec2(i, n), 0).rg * w;
+    }
+  }
+  float e = 0.0;
+  for (int n = 0; n < ${NH}; n++) e += dot(acc[n], acc[n]);
+  float v = sqrt(0.5 * e) * uNorm;
+  // with damping the modal amplitudes are complex, so the rms only touches zero at
+  // isolated points. the nodal lines are drawn from a real standing wave instead:
+  // the dominant harmonic seen at the phase where it carries the most energy
+  vec2 a = vec2(0.0);
+  for (int n = 0; n < ${NH}; n++) if (n == uLineN) a = acc[n];
+  float sw = dot(a, uLinePh) * uNorm;
+  if (uEnc == 1) { v = sqrt(clamp(v * 0.5, 0.0, 1.0)); sw = 0.5 + 0.5 * clamp(sw, -1.0, 1.0); }
+  fragColor = vec4(v, sw, 0.0, 1.0);
+}`;
+
+// snapshot of whatever is on screen, for the cross-fade
+const FRAG_MIX = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+uniform sampler2D uOld, uNew;
+uniform float uT;
+uniform vec2 uSize;
+void main() {
+  vec2 q = gl_FragCoord.xy / uSize;
+  fragColor = vec4(mix(texture(uOld, q).rg, texture(uNew, q).rg, uT), 0.0, 1.0);
+}`;
+
+// pass 2: the picture
+const FRAG_STYLE = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 fragColor;
+uniform sampler2D uOld, uNew;
+uniform float uBlend;
+uniform int   uEnc;
+uniform vec2  uTexel;
+uniform vec2  uOrigin, uPlate;
+uniform float uSide;
+uniform float uRot;
+uniform int   uStyle;       // 0 lines, 1 density, 2 contours, 3 liquid
+uniform int   uMat;         // 0 chrome, 1 gloss, 2 water
+uniform int   uPal;
+uniform vec3  uBg, uTint;
+uniform float uLineW, uSoft, uLevels, uFill, uDepth;
+uniform vec2  uLight;       // key light direction on screen
+uniform vec2  uDrive;
+uniform int   uShowDrive;
+uniform vec2  uFinger[4];
+uniform int   uFingerN;
+${GLSL_COMMON}
+
+vec3 palette(int p, float t) {
+  float a = abs(t);
+  vec3 hi, lo;
+  if (p == 0)      { hi = vec3(1.00, 0.82, 0.45); lo = vec3(0.24, 0.42, 0.62); }
+  else if (p == 1) { hi = vec3(0.62, 0.93, 1.00); lo = vec3(0.30, 0.36, 0.80); }
+  else if (p == 2) { hi = vec3(1.00, 0.62, 0.28); lo = vec3(0.52, 0.10, 0.36); }
+  else return mix(uBg, vec3(1.0), a);
+  return mix(uBg, t > 0.0 ? hi : lo, pow(a, 0.75));
+}
+
+float fld(vec2 q) {
+  float v = mix(texture(uOld, q).r, texture(uNew, q).r, uBlend);
+  return uEnc == 1 ? 2.0 * v * v : v;
+}
+float sfld(vec2 q) {
+  float v = mix(texture(uOld, q).g, texture(uNew, q).g, uBlend);
+  return uEnc == 1 ? v * 2.0 - 1.0 : v;
+}
+float rho(vec2 q) { return exp(-fld(q) / uSoft); }
+float thresh() { return mix(0.94, 0.22, uFill); }
+// liquid lying in a channel has a round cross-section: 0 at the shore, 1 on the crest
+float height(vec2 q) {
+  float t = thresh();
+  float h = clamp((rho(q) - t) / (1.0 - t), 0.0, 1.0);
+  return sqrt(h * (2.0 - h));
+}
+
+// a studio around the plate: dim surround, one soft key, a strip light opposite
+vec3 env(vec3 R) {
+  vec3 Ld = normalize(vec3(uLight * 0.75, 0.66));
+  float side = dot(normalize(R.xy + 1e-5), uLight);
+  vec3 c = mix(vec3(0.02, 0.022, 0.028), vec3(0.12, 0.13, 0.15), smoothstep(-1.0, 1.0, side));
+  // a broad overhead dome: flat crests mirror it, steep shores fall off into the dark surround
+  c += vec3(0.30, 0.32, 0.36) * smoothstep(-0.3, 0.6, R.z) + vec3(0.40, 0.42, 0.45) * smoothstep(0.6, 0.97, R.z);
+  c += vec3(1.0, 0.98, 0.95) * 2.4 * smoothstep(0.93, 0.985, dot(R, Ld));
+  vec2 perp = vec2(-uLight.y, uLight.x);
+  float strip = smoothstep(0.07, 0.025, abs(dot(R.xy, perp))) * smoothstep(0.15, 0.45, -dot(R.xy, uLight));
+  c += vec3(0.75, 0.82, 0.95) * 0.9 * strip;
+  return c;
+}
+
+// a ruled plate surface, so clear liquid has something to bend
+vec3 plateSurface(vec2 q, vec3 base) {
+  vec2 g = q * uPlate / uSide * 18.0;
+  vec2 fw = fwidth(g) + 1e-5;
+  vec2 d = abs(fract(g - 0.5) - 0.5) / fw;
+  float line = 1.0 - min(min(d.x, d.y), 1.0);
+  return base + vec3(0.07, 0.075, 0.085) * line;
+}
+
+void main() {
+  vec2 pc = gl_FragCoord.xy - (uOrigin + uPlate * 0.5);
+  float cr = cos(uRot), sr = sin(uRot);
+  pc = vec2(cr * pc.x + sr * pc.y, -sr * pc.x + cr * pc.y);
+  vec2 q = pc / uPlate + 0.5;
+
+  bool inside;
+  if (uGeom == 1) {
+    float r = length(q * 2.0 - 1.0);
+    inside = r <= 1.0 && r >= uInner;
+  } else if (uGeom == 2) {
+    inside = q.x >= 0.0 && q.x <= 1.0 && q.y >= 0.0 && q.y <= 2.0 * q.x && q.y <= 2.0 - 2.0 * q.x;
+  } else {
+    inside = q.x >= 0.0 && q.x <= 1.0 && q.y >= 0.0 && q.y <= 1.0;
+  }
+  // derivatives must be taken in uniform control flow, before any early return
+  vec2 qc = clamp(q, 0.0, 1.0);
+  float v = fld(qc);
+  float fwv = fwidth(v * uLevels);
+  // the signed standing wave crosses zero cleanly, so its zero set is a set of
+  // continuous curves; distance to them in screen pixels from a central difference
+  float sw = sfld(qc);
+  vec2 sx = vec2(uTexel.x, 0.0), sy = vec2(0.0, uTexel.y);
+  vec2 gv = vec2((sfld(qc + sx) - sfld(qc - sx)) / (2.0 * uTexel.x * uPlate.x),
+                 (sfld(qc + sy) - sfld(qc - sy)) / (2.0 * uTexel.y * uPlate.y));
+  vec3 col;
+  // distance to the nearest node, in screen pixels
+  float dn = abs(sw) / max(length(gv), 1e-6);
+
+  if (uStyle == 0) {
+    vec3 base = mix(uBg, vec3(1.0), 0.035);
+    vec3 lc = palette(uPal, 1.0);
+    float a = 1.0 - smoothstep(uLineW * 0.5 - 0.6, uLineW * 0.5 + 0.6, dn);
+    col = base + lc * exp(-dn / (uLineW * 4.0)) * 0.16;
+    col = mix(col, lc, a);
+  } else if (uStyle == 1) {
+    col = palette(uPal, exp(-v / uSoft));
+  } else if (uStyle == 2) {
+    col = mix(uBg, palette(uPal, v), 0.32);
+    float x = v * uLevels;
+    float g = abs(fract(x - 0.5) - 0.5) / max(fwv, 1e-6);
+    float cl = 1.0 - smoothstep(uLineW * 0.35 - 0.5, uLineW * 0.35 + 0.5, g);
+    col = mix(col, palette(uPal, -1.0), cl * 0.85 * step(0.5, x));
+    float node = 1.0 - smoothstep(uLineW * 0.8 - 0.6, uLineW * 0.8 + 0.6, dn);
+    col = mix(col, palette(uPal, 1.0), node);
+  } else {
+    // ---- liquid ----
+    vec2 dx = vec2(uTexel.x, 0.0), dy = vec2(0.0, uTexel.y);
+    float h  = height(q);
+    float hx = (height(q + dx) - height(q - dx)) / (2.0 * dx.x * uPlate.x);
+    float hy = (height(q + dy) - height(q - dy)) / (2.0 * dy.y * uPlate.y);
+    float hs = uDepth * uSide * 0.012;                   // crest height in pixels
+    vec2 sl = vec2(hx, hy) * hs;
+    float sm = length(sl);
+    if (sm > 6.0) sl *= 6.0 / sm;
+    vec3 N = normalize(vec3(-sl, 1.0));
+    N.xy = vec2(cr * N.x - sr * N.y, sr * N.x + cr * N.y);  // plate frame → screen
+    vec3 V = vec3(0.0, 0.0, 1.0);
+    vec3 L = normalize(vec3(uLight * 0.8, 0.9));
+    vec3 R = reflect(-V, N);
+    float fres = 0.04 + 0.96 * pow(1.0 - max(N.z, 0.0), 5.0);
+    float spec = pow(max(dot(N, normalize(L + V)), 0.0), 110.0);
+
+    float r0 = rho(q), t = thresh();
+    float w = max(fwidth(r0), 1e-4) * 0.8;
+    float cover = smoothstep(t - w, t + w, r0);
+
+    // the beads throw a soft shadow away from the key light
+    vec2 lp = vec2(cr * uLight.x + sr * uLight.y, -sr * uLight.x + cr * uLight.y);
+    vec2 off = lp * hs * 0.9 / uPlate;
+    float shadow = smoothstep(t - 0.12, t + 0.02, rho(q - off)) * 0.5;
+
+    vec3 plateCol = mix(uBg, vec3(0.10, 0.105, 0.12), 0.6);
+    if (uMat == 2) plateCol = plateSurface(q, plateCol);
+    plateCol *= 1.0 - shadow * (1.0 - cover);
+
+    vec3 liq;
+    if (uMat == 0) {
+      liq = env(R) * vec3(0.92, 0.94, 0.98) * (0.75 + 0.25 * fres);
+    } else if (uMat == 1) {
+      float diff = max(dot(N, L), 0.0);
+      liq = uTint * (0.14 + 0.78 * diff) + env(R) * fres * 0.9 + vec3(spec * 1.3);
+    } else {
+      vec2 qr = q + N.xy * uDepth * 0.025 * h;            // refraction through the bead
+      vec3 under = plateSurface(qr, mix(uBg, vec3(0.10, 0.105, 0.12), 0.6));
+      float lap = height(q + dx) + height(q - dx) + height(q + dy) + height(q - dy) - 4.0 * h;
+      float caustic = clamp(-lap * 6.0, 0.0, 1.0);
+      liq = under * vec3(0.82, 0.93, 1.0) + vec3(0.55, 0.8, 1.0) * caustic * 0.35
+          + env(R) * fres + vec3(spec * 1.5);
+    }
+    col = mix(plateCol, liq, cover);
+  }
+  if (!inside) { fragColor = vec4(uBg, 1.0); return; }
+
+  if (uShowDrive == 1) {
+    float d = distance(q * uPlate, uDrive * uPlate);
+    col = mix(col, vec3(1.0, 0.36, 0.42), (1.0 - smoothstep(2.5, 4.5, d)) * 0.9);
+    col += vec3(1.0, 0.36, 0.42) * (1.0 - smoothstep(5.0, 9.0, d)) * 0.25;
+    for (int i = 0; i < 4; i++) {
+      if (i >= uFingerN) break;
+      float fd = distance(q * uPlate, uFinger[i] * uPlate);
+      float ring = 1.0 - smoothstep(1.0, 2.6, abs(fd - 6.0));
+      col = mix(col, vec3(0.42, 0.74, 1.0), ring * 0.85);
+    }
+  }
+  fragColor = vec4(col, 1.0);
+}`;
+
+const progRms   = program(VERT_QUAD, FRAG_RMS);
+const progMix   = program(VERT_QUAD, FRAG_MIX);
+const progStyle = program(VERT_QUAD, FRAG_STYLE);
+function uniformsOf(prog, names) {
+  const o = {};
+  names.forEach(k => o[k] = gl.getUniformLocation(prog, k));
+  return o;
+}
+const uR = uniformsOf(progRms, ['uMode', 'uCount', 'uNH', 'uAmp', 'uNorm', 'uSize', 'uEnc', 'uProf', 'uGeom', 'uInner',
+  'uLineN', 'uLinePh']);
+const uM = uniformsOf(progMix, ['uOld', 'uNew', 'uT', 'uSize']);
+const uS = uniformsOf(progStyle, ['uOld', 'uNew', 'uBlend', 'uEnc', 'uTexel', 'uOrigin', 'uPlate', 'uSide', 'uRot',
+  'uStyle', 'uMat', 'uPal', 'uBg', 'uTint', 'uLineW', 'uSoft', 'uLevels', 'uFill', 'uDepth', 'uLight',
+  'uDrive', 'uShowDrive', 'uFinger', 'uFingerN', 'uProf', 'uGeom', 'uInner']);
+
+// a float render target when the browser has one; otherwise 8 bits, sqrt-encoded
+const floatRT = !!gl.getExtension('EXT_color_buffer_float');
+let fieldEnc = floatRT ? 0 : 1;
+let fieldN = 0;
+let fieldTex = [], fieldFbo = [];
+let fOld = 0, fNew = 1, fTmp = 2;
+
+function allocField(n) {
+  fieldTex.forEach(t => gl.deleteTexture(t));
+  fieldFbo.forEach(f => gl.deleteFramebuffer(f));
+  fieldTex = []; fieldFbo = [];
+  for (let i = 0; i < 3; i++) {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    // r: rms, g: the signed standing wave the nodal lines are drawn from
+    if (fieldEnc === 0) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, n, n, 0, gl.RG, gl.HALF_FLOAT, null);
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, n, n, 0, gl.RG, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE && fieldEnc === 0) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      fieldEnc = 1;                       // half float is not renderable here after all
+      return allocField(n);
+    }
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    fieldTex.push(t); fieldFbo.push(f);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  fieldN = n;
+}
+
+const texAmp = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, texAmp);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, MAXMODES, NH, 0, gl.RG, gl.FLOAT, null);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+const ampBuf = new Float32Array(MAXMODES * NH * 2);
+const styleModeBuf = new Float32Array(MAXMODES * 4);
+
+let fieldValid = false, fieldDirty = true, snapPending = false, blend = 1;
+
+// a new mode set: the next frame freezes what is on screen and fades from it
+function styleCatalogueChanged() {
+  if (style !== 'grains' && fieldValid) snapPending = true;
+  fieldDirty = true;
+}
+// coming back to a style after a while away: no point morphing from stale state
+function snapAmplitudes() {
+  for (const m of catalogue) if (m.are) m.snapTo = true;
+  fieldDirty = true;
+}
+
+/* every mode's complex amplitude rings toward its target with its own time
+   constant. a closed momentary gate is the plate left undriven: targets go
+   to zero and the figure rings down. returns whether anything moved. */
+function stepMorph(dt) {
+  const g = gateOpen() ? 1 : 0;
+  const K = 0.5 * P.morph;
+  const eps = 1e-5 * (rmsPeak || 1);
+  let moving = false;
+  for (const m of catalogue) {
+    if (!m.tre) continue;
+    if (!m.are) { m.are = new Float32Array(NH); m.aim = new Float32Array(NH); m.snapTo = true; }
+    const k = (K <= 0 || m.snapTo) ? 1 : 1 - Math.exp(-dt / Math.min(8, Math.max(1e-3, K * m.tau)));
+    m.snapTo = false;
+    for (let n = 0; n < NH; n++) {
+      const tr = m.tre[n] * g, ti = m.tim[n] * g;
+      const dr = tr - m.are[n], di = ti - m.aim[n];
+      if (dr === 0 && di === 0) continue;
+      if (k >= 1 || Math.abs(dr) + Math.abs(di) < eps) { m.are[n] = tr; m.aim[n] = ti; }
+      else { m.are[n] += dr * k; m.aim[n] += di * k; }
+      moving = true;
+    }
+  }
+  return moving;
+}
+
+// a coarse cpu estimate of the current peak, for normalisation while morphing
+const CG = 24;
+function insidePlate(x, y) {
+  if (geom === 'disc' || geom === 'ring') { const r = Math.hypot(x * 2 - 1, y * 2 - 1); return r <= 1 && r >= ringInner(); }
+  if (geom === 'tri') return y >= 0 && y <= 2 * x && y <= 2 - 2 * x;
+  return true;
+}
+let lineN = 0, linePh = [1, 0];
+function coarsePeak(list, nh) {
+  for (const m of list) {
+    if (m.wc) continue;
+    m.wc = new Float32Array(CG * CG);
+    for (let j = 0; j < CG; j++) for (let i = 0; i < CG; i++) {
+      const x = (i + 0.5) / CG, y = (j + 0.5) / CG;
+      m.wc[j * CG + i] = insidePlate(x, y) ? shapeAt(m, x, y) : 0;
+    }
+  }
+  let mx = 0;
+  // per harmonic: energy and the 2×2 covariance of (re, im) over the plate. its
+  // principal axis is the phase at which that harmonic's standing wave is strongest
+  const saa = new Float64Array(nh), sbb = new Float64Array(nh), sab = new Float64Array(nh);
+  for (let c = 0; c < CG * CG; c++) {
+    let e = 0;
+    for (let n = 0; n < nh; n++) {
+      let re = 0, im = 0;
+      for (const m of list) { re += m.are[n] * m.wc[c]; im += m.aim[n] * m.wc[c]; }
+      e += re * re + im * im;
+      saa[n] += re * re; sbb[n] += im * im; sab[n] += re * im;
+    }
+    if (e > mx) mx = e;
+  }
+  let best = -1;
+  for (let n = 0; n < nh; n++) {
+    const en = saa[n] + sbb[n];
+    if (en > best) { best = en; lineN = n; }
+  }
+  const phi = 0.5 * Math.atan2(2 * sab[lineN], saa[lineN] - sbb[lineN]);
+  linePh = [Math.cos(phi), Math.sin(phi)];
+  return Math.sqrt(0.5 * mx);
+}
+
+let styleNorm = 1;
+function uploadStyleAmps() {
+  // the strongest modes right now, by current (not target) amplitude
+  const list = [];
+  let nh = 1;
+  for (const m of catalogue) {
+    if (!m.are) continue;
+    let e = 0;
+    for (let n = 0; n < NH; n++) {
+      const en = m.are[n] * m.are[n] + m.aim[n] * m.aim[n];
+      if (en > 0) { e += en; nh = Math.max(nh, n + 1); }
+    }
+    if (e > 0) { m._e = e; list.push(m); }
+  }
+  list.sort((a, b) => b._e - a._e);
+  const top = list.length ? list[0]._e : 0;
+  const use = list.filter(m => m._e > top * 1e-6).slice(0, MAXMODES);
+  ampBuf.fill(0);
+  use.forEach((m, i) => {
+    styleModeBuf[i * 4] = m.p; styleModeBuf[i * 4 + 1] = m.q;
+    styleModeBuf[i * 4 + 2] = 0; styleModeBuf[i * 4 + 3] = m.psi;
+    for (let n = 0; n < NH; n++) {
+      ampBuf[(n * MAXMODES + i) * 2] = m.are[n];
+      ampBuf[(n * MAXMODES + i) * 2 + 1] = m.aim[n];
+    }
+  });
+  gl.bindTexture(gl.TEXTURE_2D, texAmp);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, MAXMODES, NH, gl.RG, gl.FLOAT, ampBuf);
+  // a figure keeps its brightness while it settles, and fades when it rings down
+  const cur = use.length ? coarsePeak(use, nh) : 0;
+  styleNorm = 1 / Math.max(cur, rmsPeak || 1e-9, 1e-9);
+  return { count: use.length, nh };
+}
+
+function bindFieldPass(fbo) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.viewport(0, 0, fieldN, fieldN);
+}
+
+// runs inside frame(), with the scissor already set to the framed region
+function drawStyled(dt, bg) {
+  const want = Math.max(256, Math.min(1024, Math.round(Math.max(plate[0], plate[1]) * 0.75)));
+  if (Math.abs(want - fieldN) > 32 || !fieldN) { allocField(want); fieldValid = false; fieldDirty = true; snapPending = false; }
+
+  if (stepMorph(dt)) fieldDirty = true;
+  blend = Math.min(1, blend + dt / Math.max(1e-3, 0.6 * P.morph));
+  if (P.morph < 0.005) blend = 1;
+
+  gl.disable(gl.SCISSOR_TEST);
+  gl.bindVertexArray(quadVao);
+  if (snapPending) {
+    // freeze the current picture into the spare target and fade out of it
+    bindFieldPass(fieldFbo[fTmp]);
+    gl.useProgram(progMix);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fieldTex[fOld]); gl.uniform1i(uM.uOld, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fieldTex[fNew]); gl.uniform1i(uM.uNew, 1);
+    gl.uniform1f(uM.uT, blend);
+    gl.uniform2f(uM.uSize, fieldN, fieldN);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    [fOld, fTmp] = [fTmp, fOld];
+    blend = P.morph < 0.005 ? 1 : 0;
+    snapPending = false;
+    fieldDirty = true;
+  }
+  if (fieldDirty) {
+    const { count, nh } = uploadStyleAmps();
+    bindFieldPass(fieldFbo[fNew]);
+    gl.useProgram(progRms);
+    gl.uniform4fv(uR.uMode, styleModeBuf);
+    gl.uniform1i(uR.uCount, count);
+    gl.uniform1i(uR.uNH, nh);
+    gl.uniform1i(uR.uGeom, GEOM_ID[geom]);
+    gl.uniform1f(uR.uInner, ringInner());
+    gl.uniform1f(uR.uNorm, styleNorm);
+    gl.uniform1i(uR.uLineN, lineN);
+    gl.uniform2f(uR.uLinePh, linePh[0], linePh[1]);
+    gl.uniform2f(uR.uSize, fieldN, fieldN);
+    gl.uniform1i(uR.uEnc, fieldEnc);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texAmp);  gl.uniform1i(uR.uAmp, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texProf); gl.uniform1i(uR.uProf, 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    fieldDirty = false;
+    if (!fieldValid) { fieldValid = true; blend = 1; }
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, W, H);
+  gl.enable(gl.SCISSOR_TEST);
+
+  // line widths keep their size relative to the plate when capturing at higher res
+  const dprEff = capturing ? (H / Math.max(1, innerHeight)) : Math.min(window.devicePixelRatio || 1, 2);
+  gl.useProgram(progStyle);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fieldTex[fOld]); gl.uniform1i(uS.uOld, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fieldTex[fNew]); gl.uniform1i(uS.uNew, 1);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texProf);       gl.uniform1i(uS.uProf, 2);
+  gl.uniform1f(uS.uBlend, blend);
+  gl.uniform1i(uS.uEnc, fieldEnc);
+  gl.uniform2f(uS.uTexel, 1 / fieldN, 1 / fieldN);
+  gl.uniform2f(uS.uOrigin, origin[0], origin[1]);
+  gl.uniform2f(uS.uPlate, plate[0], plate[1]);
+  gl.uniform1f(uS.uSide, Math.max(1, side));
+  gl.uniform1f(uS.uRot, plateAngle());
+  gl.uniform1i(uS.uGeom, GEOM_ID[geom]);
+  gl.uniform1f(uS.uInner, ringInner());
+  gl.uniform1i(uS.uStyle, style === 'liquid' ? 3 : SUB_KEYS.indexOf(smoothSub));
+  gl.uniform1i(uS.uMat, LMAT_KEYS.indexOf(liqMat));
+  gl.uniform1i(uS.uPal, palette);
+  gl.uniform3f(uS.uBg, bg[0], bg[1], bg[2]);
+  const tc = coarseRgb();
+  gl.uniform3f(uS.uTint, tc[0], tc[1], tc[2]);
+  gl.uniform1f(uS.uLineW, P.linew * dprEff);
+  gl.uniform1f(uS.uSoft, P.soft);
+  gl.uniform1f(uS.uLevels, P.levels);
+  gl.uniform1f(uS.uFill, P.lfill);
+  gl.uniform1f(uS.uDepth, P.depth);
+  const la = P.light * Math.PI / 180;
+  gl.uniform2f(uS.uLight, Math.cos(la), Math.sin(la));
+  const dp = drivePoint();
+  gl.uniform2f(uS.uDrive, dp[0], dp[1]);
+  gl.uniform1i(uS.uShowDrive, showDrive ? 1 : 0);
+  gl.uniform2fv(uS.uFinger, fingerBuf);
+  gl.uniform1i(uS.uFingerN, fingers.length);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* ---- ui ---- */
+function updateStyleUI() {
+  const grains = style === 'grains';
+  const disp_ = (el, on) => { if (el) el.style.display = on ? '' : 'none'; };
+  const byId = id => document.getElementById(id);
+  disp_(byId('sec-grains'), grains);
+  // the midi / pin buttons live in a wrapper around the control — hide that whole
+  ['sub-field', 'fieldmode', 'btn-grains', 'sub-medium', 'medium-row'].forEach(id => {
+    const el = byId(id);
+    disp_(el && (el.closest('.midi-wrap') || el), grains);
+  });
+  disp_(byId('smoothsub'), style === 'smooth');
+  disp_(byId('liquidmat'), style === 'liquid');
+  const sm = style === 'smooth', lq = style === 'liquid';
+  const show = { morph: !grains, linew: sm && smoothSub !== 'density', soft: (sm && smoothSub === 'density') || lq,
+                 levels: sm && smoothSub === 'contours', lfill: lq, depth: lq, light: lq };
+  Object.keys(show).forEach(k => disp_(byId('param-' + k), show[k]));
+  document.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === style));
+  document.querySelectorAll('[data-sub]').forEach(b => b.classList.toggle('active', b.dataset.sub === smoothSub));
+  document.querySelectorAll('[data-lmat]').forEach(b => b.classList.toggle('active', b.dataset.lmat === liqMat));
+  const tag = byId('style-tag');
+  if (tag) tag.textContent = grains ? '' : sm ? smoothSub : liqMat;
+}
+function setStyle(s) {
+  if (!STYLE_KEYS.includes(s)) return;
+  if (s !== 'grains' && style === 'grains') snapAmplitudes();
+  style = s;
+  updateStyleUI();
+}
+function setSmoothSub(s) { if (SUB_KEYS.includes(s)) { smoothSub = s; updateStyleUI(); } }
+function setLiqMat(m) { if (LMAT_KEYS.includes(m)) { liqMat = m; updateStyleUI(); } }
+document.querySelectorAll('[data-style]').forEach(b => b.addEventListener('click', () => setStyle(b.dataset.style)));
+document.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => setSmoothSub(b.dataset.sub)));
+document.querySelectorAll('[data-lmat]').forEach(b => b.addEventListener('click', () => setLiqMat(b.dataset.lmat)));
+
 let t = 0, last = performance.now();
 
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   if (!paused) {
-    t += dt; stepGrains(dt); tickLfo(dt, now);
+    t += dt; tickLfo(dt, now);
+    if (style === 'grains') stepGrains(dt);
     if (P.rotspd) plateRot = (plateRot + P.rotspd * dt * Math.PI / 180) % TAU;
   }
   tickMidi(dt);
@@ -2434,6 +3084,12 @@ function frame(now) {
   }
 
   const bg = hex2rgb(colCanvas);
+  for (let i = 0; i < 4; i++) {
+    fingerBuf[i * 2]     = i < fingers.length ? fingers[i].x : -9;
+    fingerBuf[i * 2 + 1] = i < fingers.length ? fingers[i].y : -9;
+  }
+  if (style !== 'grains') drawStyled(dt, bg);
+  else {
   gl.useProgram(progField);
   gl.bindVertexArray(quadVao);
   gl.uniform4fv(uF.uMode, modeBuf);
@@ -2451,14 +3107,11 @@ function frame(now) {
   gl.uniform2f(uF.uDrive, dp[0], dp[1]);
   gl.uniform1i(uF.uShowDrive, showDrive ? 1 : 0);
   gl.uniform3f(uF.uBg, bg[0], bg[1], bg[2]);
-  for (let i = 0; i < 4; i++) {
-    fingerBuf[i * 2]     = i < fingers.length ? fingers[i].x : -9;
-    fingerBuf[i * 2 + 1] = i < fingers.length ? fingers[i].y : -9;
-  }
   gl.uniform2fv(uF.uFinger, fingerBuf);
   gl.uniform1i(uF.uFingerN, fingers.length);
   gl.uniform1f(uF.uRot, plateAngle());
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
 
   // the ghost goes on after the field (which is opaque and would wipe it) and
   // before the grains, so the newest grains always read crisp on top
@@ -2475,7 +3128,7 @@ function frame(now) {
     gl.disable(gl.BLEND);
   }
 
-  if (showGrains && grainCount > 0) {
+  if (style === 'grains' && showGrains && grainCount > 0) {
     gl.useProgram(progPoint);
     gl.bindVertexArray(ptVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, ptBuf);
@@ -3402,7 +4055,8 @@ function snapshotPatch() {
     plate:  { geom, edge, disp, material },
     drive:  { waveform, snap: snapOn },
     grains: { medium, evenFeed, momentary },
-    render: { field: fieldMode, palette, grains: showGrains, driver: showDrive, canvas: colCanvas },
+    render: { field: fieldMode, palette, grains: showGrains, driver: showDrive, canvas: colCanvas,
+              style, smooth: smoothSub, liquid: liqMat },
     audio:  { realHz },
     frame:  { aspect: document.getElementById('aspect').value,
               capres: document.getElementById('capres').value },
@@ -3468,6 +4122,10 @@ function applyPatch(s) {
   // already stores exactly, against a catalogue that has not been rebuilt yet
   if (typeof dr.snap === 'boolean') { snapOn = dr.snap; btnSnap.classList.toggle('active', snapOn); }
   if (rn.field === 0 || rn.field === 1 || rn.field === 2) setField(rn.field);
+  // patches from before the smooth styles load as grains
+  setSmoothSub(SUB_KEYS.includes(rn.smooth) ? rn.smooth : 'lines');
+  setLiqMat(LMAT_KEYS.includes(rn.liquid) ? rn.liquid : 'chrome');
+  setStyle(STYLE_KEYS.includes(rn.style) ? rn.style : 'grains');
   if (MED_KEYS.includes(gr.medium)) setMedium(gr.medium);
   if (typeof gr.evenFeed === 'boolean') setEvenFeed(gr.evenFeed);
   if ([0, 1, 2].includes(gr.momentary)) setMomentary(gr.momentary);
@@ -4185,6 +4843,7 @@ addEventListener('keydown', e => {
     const cur = btns.findIndex(b => b.classList.contains('active'));
     btns[(cur + 1) % btns.length].click();
   }
+  else if (k === 'y') setStyle(STYLE_KEYS[(STYLE_KEYS.indexOf(style) + 1) % STYLE_KEYS.length]);
   else if (k === 's') document.getElementById('btn-png').click();
   else if (k === 'v') btnRec.click();
   else if (k === 'h') document.getElementById('paneltoggle').click();
@@ -4199,6 +4858,7 @@ buildParamRows(DRIVEPT_PARAMS, document.getElementById('params-drivept'));
 buildParamRows(GRAIN_PARAMS, document.getElementById('params-grain'));
 buildParamRows(GRAINCOL_PARAMS, document.getElementById('params-graincol'));
 buildParamRows(RENDER_PARAMS, document.getElementById('params-render'));
+buildParamRows(STYLE_PARAMS, document.getElementById('params-style'));
 buildParamRows(AUDIO_PARAMS, document.getElementById('params-audio'));
 buildParamRows(MIDI_PARAMS, document.getElementById('params-midi'));
 buildParamRows(EXPORT_PARAMS, document.getElementById('params-export'));
@@ -4211,6 +4871,7 @@ updateEdgeButtons();
 updateRealUnitsEnable();
 updateMidiNotesUI();
 setMedium(medium);
+updateStyleUI();
 updateSwatches();
 buildCatalogue();
 solveModes();
