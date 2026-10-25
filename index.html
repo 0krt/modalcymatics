@@ -322,6 +322,15 @@
 
   /* modal spectrum readout */
   #spectrum { width: 100%; height: 76px; display: block; margin: 4px 0 8px; }
+  /* the same readout as a bar across the top of the plate view */
+  #spec-top {
+    position: fixed; top: 62px; left: 22px; right: calc(var(--panel-w) + 22px); z-index: 5;
+    padding: 4px 10px; background: var(--panel); border: 1px solid var(--line-strong);
+    border-radius: 4px; transition: right 0.25s ease;
+  }
+  body.panel-hidden #spec-top { right: 22px; }
+  #spec-top[hidden] { display: none; }
+  #spec-top #spectrum { margin: 0; }
   /* a fixed height: the list is rewritten on every solve, and letting it grow
      and shrink made the whole panel jump while an lfo swept the frequency */
   #modelist {
@@ -615,6 +624,7 @@
   <div class="sub" id="subtitle">kirchhoff plate · modal superposition</div>
 </div>
 
+<div id="spec-top" hidden></div>
 <div id="recbadge"><span class="dot"></span><span id="rectime">REC 00:00</span></div>
 <div id="status"></div>
 <button id="paneltoggle" aria-label="Show or hide the controls panel" aria-expanded="true" aria-controls="panel">☰</button>
@@ -667,24 +677,27 @@
         <button class="tool" data-disp="membrane">membrane ω∝k</button>
       </div>
       <div class="hint" id="i-plate">
-        a real plate is fourth-order (biharmonic), so doubling the frequency scales the wavenumber by
-        <b>√2</b>, not 2. the membrane setting is the ordinary wave equation for comparison.<br><br>
-        <b>free</b> — rim moves freely, the classic loose Chladni plate.<br>
-        <b>supported</b> — rim pinned to zero but free to tilt.<br>
-        <b>clamped</b> — rim pinned <i>and</i> held flat (w = w′ = 0). the stiffest case, so every mode
-        sits higher, and a boundary layer forms at the rim.<br>
-        <b>mixed c–f</b> — clamped along x, free along y: a rectangular plate held on two opposite
-        edges only.<br><br>
-        the rectangle uses <b>beam eigenfunctions</b> per axis (the Ritz construction); the disc uses
-        Bessel modes, with the clamped case needing the modified-Bessel companion. the <b>ring</b> is
-        supported on both rims, and the <b>equilateral triangle</b> uses the exact Lamé modes built by
-        reflecting six plane waves — both are only defined for the supported case here.<br><br>
-        <b>on-screen size</b> shrinks the sheet, and it is a real size change, not a zoom: the
-        drive frequency fixes the wavelength, so a smaller plate fits fewer of them. every mode climbs
-        as <code>1/s²</code> (<code>1/s</code> for a membrane), and at a fixed frequency the figure
-        coarsens — half the size shows the pattern the full plate made at a quarter the frequency.<br><br>
-        the sheet's real dimensions — size, thickness and material — live under <b>Real units</b>;
-        the size there is the full-frame plate, so the drive's hertz stay put as you shrink it.
+        a real plate obeys a fourth-order (biharmonic) equation, so frequency goes as the
+        wavenumber squared: doubling the frequency multiplies the wavenumber by <b>√2</b>, not 2.
+        the membrane setting uses the ordinary wave equation for comparison.<br><br>
+        <b>free</b>: the edge is unsupported and moves freely. this is Chladni's own setup.<br>
+        <b>supported</b>: the edge cannot move up or down, but can rotate.<br>
+        <b>clamped</b>: the edge can neither move nor rotate (w = w′ = 0). this is the stiffest
+        condition, so every mode is higher, and the shapes bend sharply close to the edge.<br>
+        <b>mixed c–f</b>: clamped along x, free along y, i.e. a rectangle held along two opposite
+        edges.<br><br>
+        the rectangle is built from <b>beam eigenfunctions</b> along each axis (a Ritz
+        approximation). the disc uses Bessel functions; the clamped disc also needs the modified
+        Bessel function I<sub>n</sub>. the <b>ring</b> is supported on both edges, and the
+        <b>equilateral triangle</b> uses its exact (Lamé) modes, built from six plane waves. both are
+        only available with supported edges here.<br><br>
+        <b>on-screen size</b> changes the size of the plate, not the zoom. the drive frequency sets
+        the wavelength, so a smaller plate holds fewer wavelengths: every mode frequency rises as
+        <code>1/s²</code> (<code>1/s</code> for a membrane), and at a fixed drive the figure gets
+        coarser. at half size you see the pattern the full-size plate makes at a quarter of the
+        frequency.<br><br>
+        the physical size, thickness and material are under <b>Real units</b>. the size there is the
+        full-frame plate, so the drive's hertz don't change when you shrink it here.
       </div>
     </div>
 
@@ -699,13 +712,15 @@
       <div id="params-units"></div>
       <div id="units-out"></div>
       <div class="hint" id="i-units">
-        converts the abstract frequency scale into hertz for an actual sheet:
+        converts the plate's frequency units into hertz for a real sheet:
         <code>f = π F h c<sub>p</sub> / (2 L² √12)</code>, with <code>c<sub>p</sub> = √(E / ρ(1−ν²))</code>.
-        the fourth-power in <b>L</b> is the whole story of plate tuning — double the size and every
-        pitch drops two octaves. thickness scales it linearly the other way.<br><br>
-        these controls are live only while <b>real hz</b> is armed under <b>Audio</b>, since that is
-        what plays the sheet you have drawn. the hertz figures beside the drive and in the mode list
-        are read off this calibration either way.
+        frequency falls as <code>1/L²</code>, so doubling the size lowers every mode by two octaves,
+        and it rises in proportion to thickness. steel, aluminium and glass have nearly the same
+        <code>c<sub>p</sub></code>, so plates of equal size and thickness come out within a few
+        percent of each other; brass is about 30% lower.<br><br>
+        these controls only take effect while <b>real hz</b> is on under <b>Audio</b>, since that is
+        what turns them into sound. the hertz values beside the drive and in the mode list use this
+        calibration either way.
       </div>
     </div>
 
@@ -716,14 +731,14 @@
         <button class="act" id="btn-clearfingers">clear fingers <span id="finger-tag"></span></button>
       </div>
       <div class="hint" id="i-pt">
-        a driver sitting <b>on</b> a mode's nodal line cannot excite it at all. drag on the plate to move
-        the driver and watch half the catalogue vanish. corner drive couples to everything.<br><br>
-        <b>shift-click</b> the plate to pin a damping finger (up to four; shift-click one again to lift
-        it). a finger loads the plate hard: it eats the mode's q and weakens the drive's grip on
-        it at once, so at the top of the <b>finger damping</b> range a mode with an antinode under
-        your fingertip is silenced outright rather than merely blurred. a mode with a node there
-        rings on untouched, which is exactly how you pick a single figure out of a degenerate pair
-        by hand.
+        a driver placed on a mode's nodal line cannot excite that mode. drag on the plate to move the
+        driver and watch modes drop out of the list. on a free plate every mode moves at the corners,
+        so a corner drive excites all of them.<br><br>
+        <b>shift-click</b> the plate to place a damping finger (up to four; shift-click one again to
+        remove it). a finger lowers the Q of each mode that moves under it and also weakens the
+        drive's coupling to that mode, so at high <b>finger damping</b> a mode with an antinode under
+        the finger is suppressed completely. a mode with a node at that point is unaffected, which
+        lets you isolate one member of a degenerate pair by hand.
       </div>
     </div>
 
@@ -731,22 +746,21 @@
       <h2>Modes <span class="tag" id="mode-tag"></span><button class="infobtn" data-info="i-modes">i</button></h2>
       <div id="modelist"></div>
       <div class="hint" id="i-modes">
-        the modes the current drive is actually exciting, strongest first.<br><br>
-        <b>rectangle — (m,n)</b>: the number of half-wave divisions along each axis. (3,2)
-        has three across and two down. natural frequency goes as <code>m² + n²</code> for a square
-        plate; stretching the aspect ratio or clamping the edges pushes it up.<br><br>
-        <b>equilateral triangle — (p,q)</b>: the two lattice indices of the Lamé solution. frequency
-        goes as <code>p² + pq + q²</code>. the <code>′</code> twin is the mirror-antisymmetric partner
-        — it exists only when p ≠ q, which is exactly why the diagonal modes are single and every
-        other level comes in a degenerate pair.<br><br>
-        <b>disc / ring — (n,s)</b>: <i>n</i> nodal <b>diameters</b> (lines through the centre),
-        <i>s</i> nodal <b>circles</b> (rings). a trailing <code>′</code> marks the rotated twin of the
-        same mode — it has the same frequency but sits 90°/n around, and the drive point decides how
-        the two mix.<br><br>
-        <b>f</b> is the mode's natural frequency in the same units as the frequency slider — park the
-        slider on one of these numbers and that mode rings on its own. equal <b>f</b> values are
-        <b>degenerate</b>: they resonate together and superpose, which is where the intricate figures
-        come from. the bar is how hard the drive is currently pushing each one.
+        the modes the current drive is exciting, strongest first.<br><br>
+        <b>rectangle (m,n)</b>: the number of half-wavelengths along each axis. (3,2) has three across
+        and two down. on a square plate the frequency goes as <code>m² + n²</code>; changing the
+        aspect ratio or clamping the edges raises it.<br><br>
+        <b>equilateral triangle (p,q)</b>: the two lattice indices of the Lamé solution. the frequency
+        goes as <code>p² + pq + q²</code>. the <code>′</code> twin is the antisymmetric partner. it only
+        exists when p ≠ q, which is why the diagonal modes are single and all the others come in
+        degenerate pairs.<br><br>
+        <b>disc / ring (n,s)</b>: <i>n</i> nodal <b>diameters</b> (straight lines through the centre)
+        and <i>s</i> nodal <b>circles</b>. a trailing <code>′</code> marks the rotated twin: the same
+        frequency, turned by 90°/n. the drive position decides how the two combine.<br><br>
+        <b>f</b> is the mode's natural frequency, in the same units as the frequency slider. set the
+        slider to one of these values (or click the row) and that mode dominates. modes with equal
+        <b>f</b> are <b>degenerate</b>: they respond together and their shapes add, which produces
+        the more complex figures. the bar shows how strongly the drive excites each mode.
       </div>
     </div>
   </div>
@@ -787,22 +801,32 @@
         <option value="saw">saw — all, 1/n</option>
       </select>
       <div id="params-drive"></div>
-      <div class="toolrow">
-        <button class="tool" id="btn-snap">snap to resonance</button>
+      <div class="toolrow grid2">
+        <button class="tool" id="btn-snap">step through modes</button>
+        <button class="tool" id="btn-fitrange">resonant range</button>
       </div>
       <canvas role="img" aria-label="Frequency spectrum of the plate's modal response." id="spectrum"></canvas>
+      <div class="toolrow">
+        <button class="tool" id="btn-spectop">spectrum above plate</button>
+      </div>
       <div class="hint" id="i-drive">
-        the plate is a <b>linear filter</b>: waveform only matters as harmonic content. each partial
-        excites whatever modes it lands near. relative partial <b>phase</b> cannot move the sand —
-        only the amplitude spectrum can.<br><br>
-        <b>partial focus</b> is a bandpass across the harmonic series. at <code>off</code> the whole
-        spectrum drives the plate; sweep it up and it isolates one partial at a time, so you can hear
-        and see a single harmonic pull its own set of modes. <b>focus width</b> is how many neighbouring
-        partials come with it — narrow it to about 0.2 for a clean solo.<br><br>
-        controls grey out when the waveform does not use them: a sine already has one partial.<br><br>
-        <b>snap to resonance</b> quantises the drive to the nearest eigenfrequency of the current plate,
-        so a sweep lands on figures instead of passing between them. the slider still moves freely — only
-        the value it reports is snapped. the scroll wheel then steps mode by mode.
+        the plate responds linearly, so the waveform matters only through its harmonic content:
+        each partial excites the modes near its own frequency. the relative <b>phase</b> of the
+        partials doesn't change where the sand settles; only their amplitudes do.<br><br>
+        <b>partial focus</b> is a band-pass filter over the harmonic series. at <code>off</code> all
+        partials drive the plate; raise it to select one partial at a time and see which modes that
+        harmonic excites on its own. <b>focus width</b> sets how many neighbouring partials pass with
+        it; about 0.2 isolates a single one.<br><br>
+        controls the current waveform doesn't use are greyed out: a sine has only one partial.<br><br>
+        <b>step through modes</b> turns the frequency slider into a mode index: each notch is one
+        resonance of the current plate, in order, however close together or far apart they are. the
+        read-out shows the index and the frequency. the arrow keys, the scroll wheel, a midi cc and an
+        lfo on frequency all step through the same list.<br><br>
+        <b>resonant range</b> limits the frequency slider to the span from the lowest to the highest
+        resonance in the catalogue, so none of its travel is spent where there are no modes.<br><br>
+        the strip shows the drive's partials (gold) against the plate's mode frequencies (ticks).
+        <b>spectrum above plate</b> moves it to a bar over the plate, where it is wider and stays
+        visible while you work in other tabs.
       </div>
     </div>
 
@@ -814,14 +838,13 @@
       </div>
       <div id="params-audio"></div>
       <div class="hint" id="i-audio">
-        synthesises the actual drive signal — the same partial amplitudes and phases that are feeding
-        the plate, as a <b>periodic wave</b>. changing waveform, partial count, tilt or pulse width
-        changes what you hear and what the plate does, together.<br><br>
-        <b>pitch per unit</b> sets the audible hertz for one unit of modal frequency, since the
-        frequency slider is in plate units, not hertz. at 8 Hz/unit a drive of f 25 sounds at 200 Hz.<br><br>
-        <b>real hz</b> ignores that slider and plays the frequency the plate would actually sound at,
-        from the size, thickness and material set under <b>Real units</b> below — you hear the sheet
-        you drew, and those controls come alive.
+        plays the drive signal: the same partial amplitudes and phases that drive the plate, as a
+        periodic waveform. changing the waveform, partial count, tilt or focus changes the sound and
+        the figure together.<br><br>
+        <b>pitch per unit</b> sets how many hertz one unit of plate frequency plays at, since the
+        frequency slider is in plate units, not hertz. at 8 hz/unit a drive of 25 plays at 200 hz.<br><br>
+        <b>real hz</b> ignores that setting and plays the frequency the plate would physically have,
+        from the size, thickness and material under <b>Real units</b>, and enables those controls.
       </div>
     </div>
 
@@ -864,25 +887,34 @@
         <button class="tool" data-lmat="gloss">gloss</button>
         <button class="tool" data-lmat="water">water</button>
       </div>
+      <div class="colorrow" id="contourcols">
+        <label for="col-contour">contours<input type="color" id="col-contour" value="#3d6b9e"></label>
+        <label for="col-node">nodal lines<input type="color" id="col-node" value="#ffd173"></label>
+      </div>
+      <div class="colorrow" id="platecols">
+        <label for="col-plate">plate<input type="color" id="col-plate" value="#131418"></label>
+        <label for="col-grid">grid<input type="color" id="col-grid" value="#25282e"></label>
+      </div>
       <div id="params-style"></div>
       <div class="hint" id="i-style">
-        <b>grains</b> is the sand simulation. the other two draw the same time-averaged field
-        directly, per pixel, with no particles — the figure the sand would settle into, at any
+        <b>grains</b> is the sand simulation. the other two styles draw the time-averaged field
+        directly for every pixel, without particles: the figure the sand would settle into, at full
         resolution.<br><br>
-        <b>smooth</b> has three readings of it: <b>nodal lines</b> traces the still curves themselves,
-        <b>density</b> is the settled sand as a continuous glow (<b>softness</b> is how far it
-        spreads off the node), <b>contours</b> draws the amplitude as a topographic map — the nodes
-        bold, the antinodes as nested rings.<br><br>
-        <b>liquid</b> pours a glossy liquid into the nodal channels: <b>fill</b> is how much there is,
-        <b>depth</b> how tall the beads stand, <b>light angle</b> where the key light sits.
-        <b>chrome</b> is a mirror, <b>gloss</b> a tinted resin in the sand colour, <b>water</b> is
-        clear and refracts the ruled plate beneath it.<br><br>
-        <b>morph time</b> makes every change settle the way a real plate does: each mode rings up or
-        down with its own time constant, Q over π times its frequency, so low and sharp modes move
-        slowly and high or damped ones quickly. the slider scales all of them; at zero changes are
-        instant. changing the shape, edge or dispersion swaps the whole set of modes, so those
-        cross-fade over the same time instead. in a momentary mode, letting go lets the figure
-        ring down.
+        <b>smooth</b> has three views of it. <b>nodal lines</b> draws the lines that don't move.
+        <b>density</b> shades where settled sand would be; <b>softness</b> sets how far it spreads
+        from the lines. <b>contours</b> draws the amplitude as contour lines, like a topographic map,
+        with the nodal lines in bold. the two colour fields set the contour and nodal-line colours.<br><br>
+        <b>liquid</b> fills the nodal channels with a reflective liquid. <b>fill</b> sets the amount,
+        <b>depth</b> the height of the beads, <b>light angle</b> the direction of the main light.
+        <b>chrome</b> is a mirror, <b>gloss</b> a resin tinted with the sand colour, and <b>water</b> is
+        clear and refracts the plate beneath. <b>plate</b> and <b>grid</b> set the colours of that
+        surface, and <b>plate grid</b> the number of grid cells across it (0 turns the grid off).<br><br>
+        <b>morph time</b> makes changes settle the way a real plate does: each mode's amplitude moves
+        to its new value with that mode's own time constant, Q / (π f). low, sharp modes change
+        slowly; high or heavily damped ones change quickly. the slider scales all of them, and at
+        zero changes are instant. changing the shape, edge or dispersion replaces the whole set of
+        modes, so those changes cross-fade over the same time instead. in a momentary mode,
+        releasing the plate lets the figure decay.
       </div>
     </div>
 
@@ -902,28 +934,30 @@
         <button class="act" id="btn-reseed">scatter grains</button>
       </div>
       <div class="hint" id="i-grain">
-        coarse sand collects at <b>nodes</b>. very fine powder does the opposite — acoustic streaming in
-        the air carries it to the <b>antinodes</b>. which of the two is on the plate is picked under
-        <b>Rendering → medium</b>; <b>both at once</b> runs two populations in two colours, so the
-        nodal and antinodal figures appear together, and <b>fine fraction</b> is the split.<br><br>
-        <b>feed rate</b> continuously recycles grains back onto the plate, oldest first, as if you were
-        sprinkling steadily while it runs. at zero the population is static.<br><br>
-        <b>even feed</b> gives each population its own recycle cursor. it is what stops
-        <b>both at once</b> from pulsing: with one cursor for the whole population the block of
-        freshly scattered grains sweeps through the sand first and the powder after it, so each
-        figure blurs and sharpens in turn, once per turnover — a beat at the feed rate, most obvious
-        with feed high. switch it off to get that sweep back.<br><br>
-        <b>momentary</b> makes the plate an instrument you hold: it only sounds, and the grains only
-        move, while the pointer is down on it (or a midi note is held). <b>fade</b> shows
-        nothing at rest — let go and the plate stops being fed and its grains are taken off,
-        oldest first, at <b>feed rate</b> plus <b>kill rate</b> of the population per second, so a
-        sum of 4 clears it in a quarter of a second. press again and they land as a fresh sprinkle.
-        <b>noise</b> keeps the grains, but on release sprinkles them back, at the same rate,
-        onto a maximally even spread — as if a burst of noise had shaken the figure out — ready
-        for the next press to draw it again. <b>m</b> steps through the three.<br><br>
-        <b>hop threshold</b> is the local amplitude a grain needs before it will move at all — real sand
-        only migrates once the plate's acceleration beats gravity. <b>jitter</b> is random bouncing,
-        scaled by the local amplitude, so it competes with the crawl and fuzzes the lines.
+        coarse sand collects at the <b>nodes</b>. very fine powder does the opposite: air currents set
+        up by the vibration (acoustic streaming) carry it to the <b>antinodes</b>. choose which is on
+        the plate under <b>Rendering → medium</b>. <b>both at once</b> runs two populations in two
+        colours, so the nodal and antinodal figures appear together; <b>fine fraction</b> sets the
+        split.<br><br>
+        <b>feed rate</b> continuously takes the oldest grains and drops them back at random
+        positions, like sprinkling sand steadily while the plate runs. at zero the population is
+        fixed.<br><br>
+        <b>even feed</b> gives each population its own recycling cursor. with a single cursor in
+        <b>both at once</b>, the batch of freshly scattered grains passes through the sand first and
+        the powder second, so each figure blurs and sharpens in turn, once per turnover. it is most
+        visible at a high feed rate. turn it off to see that effect.<br><br>
+        <b>momentary</b> makes the plate respond only while you hold it: the drive, the sound and the
+        grain motion are on only while the pointer is down on the plate (or a midi note is held).
+        <b>fade</b>: on release the plate stops being fed and its grains are removed, oldest first,
+        at <b>feed rate</b> plus <b>kill rate</b> of the population per second, so a sum of 4 clears
+        it in a quarter of a second. the next press scatters them fresh. <b>noise</b>: on release the
+        grains are spread evenly over the plate at the same rate, and then keep bouncing by the
+        <b>jitter</b> amount, as if the plate were shaken by broadband noise. the figure dissolves
+        into a moving, even spread, and the next press draws it again. with jitter at zero the spread
+        stays still. <b>m</b> cycles through the three.<br><br>
+        <b>hop threshold</b> is the local amplitude a grain needs before it moves at all; real sand
+        only moves once the plate's acceleration exceeds gravity. <b>jitter</b> is random bouncing,
+        scaled by the local amplitude, so it works against the crawl and blurs the lines.
       </div>
     </div>
 
@@ -962,29 +996,32 @@
       <div id="params-graincol"></div>
       <div class="sublabel">motion</div>
       <div id="params-render"></div>
+      <div class="btnrow">
+        <button class="act" id="btn-rothome">reset rotation</button>
+      </div>
       <div class="hint" id="i-render">
-        <b>motion</b> is the live plate oscillation — the real drive is far too fast to see, so this
-        slows it down. it does not affect where the grains settle.<br><br>
-        <b>medium</b> picks what is on the plate: coarse sand crawling to the nodes, fine powder
-        blown to the antinodes, or both populations at once in two colours. the rest of their
-        behaviour — count, feed, crawl, the fine fraction — lives under <b>Grains</b>.<br><br>
-        <b>field</b>: <code>motion</code> shows instantaneous displacement, <code>rms</code> shows the
-        time-averaged amplitude the grains actually respond to.<br><br>
-        <b>trails</b> paints the previous frame back over the new one, so a grain leaves a fading
-        streak behind it instead of jumping. the number is the decay per frame: at 90% a grain from
-        ten frames ago is still a third as bright, at 30% it is gone almost at once. it costs nothing
-        in the physics — the sand settles exactly where it always did, you are just seeing the path
-        it took. it reads best with <b>feed rate</b> up, and turns a spinning plate into long arcs.<br><br>
-        <b>plate spin</b> turns the whole plate — sheet, field and grains together — at a
-        steady rate, and <b>plate angle</b> is a fixed offset on top of it. it is a camera
-        move, not a physical one: the modes and the sand behave exactly as they would on a
-        plate standing still. a square or triangular plate shrinks a little once rotation is
-        armed, so its corners never clip the frame while it turns.<br><br>
-        <b>canvas</b> is the ground behind the plate, and it fills the letterbox surround too, so a
-        framed export lands on one flat colour. the grain colours are ordinary parameters — hue,
-        saturation and lightness — so a controller or an lfo can drive them. the <b>fine hue</b> only
-        shows in <code>both at once</code>. the <b>driver dot</b> marks the excitation point — switch it
-        off for a clean capture.
+        <b>motion</b> slows the plate's oscillation down to a visible rate; the real drive is far too
+        fast to see. it doesn't affect where the grains settle.<br><br>
+        <b>medium</b> chooses what is on the plate: coarse sand that moves to the nodes, fine powder
+        that moves to the antinodes, or both in two colours. their other settings (count, feed,
+        crawl, fine fraction) are under <b>Grains</b>.<br><br>
+        <b>field</b>: <code>motion</code> shows the instantaneous displacement, <code>rms</code> the
+        time-averaged amplitude, which is what the grains respond to.<br><br>
+        <b>trails</b> blends the previous frame into the new one, so moving grains leave fading
+        streaks. the value is the fraction kept per frame: at 90% a grain from ten frames ago is still
+        about a third as bright, at 30% it disappears almost at once. it is purely visual; the grains
+        settle in the same places. it works best with a high <b>feed rate</b>, and turns a spinning
+        plate into arcs.<br><br>
+        <b>plate spin</b> rotates the view of the plate (sheet, field and grains together) at a
+        constant rate, and <b>plate angle</b> adds a fixed offset. only the view turns; the physics is
+        that of a stationary plate. square and triangular plates are drawn slightly smaller while
+        rotation is on, so their corners stay inside the frame. <b>reset rotation</b> stops the spin
+        and returns the plate to its starting angle.<br><br>
+        <b>canvas</b> is the background colour. it also fills the letterbox area, so exported frames
+        have a uniform background. the grain colours are ordinary parameters (hue, saturation,
+        lightness), so midi and the lfos can control them. <b>fine hue</b> is only visible in
+        <code>both at once</code>. the <b>driver dot</b> marks the excitation point; turn it off for
+        clean captures.
       </div>
     </div>
   </div>
@@ -1019,12 +1056,11 @@
           the <b>cc</b> box takes a number by hand if you would rather read it off the
           controller's manual than coax it into sending the right knob — type it, or leave it
           empty to unbind.<br><br>
-            <b>notes → resonances</b> plays the plate from a keyboard. the <b>lowest note</b> lands on
-          the plate's lowest eigenfrequency and every semitone above it steps one rung up the ladder,
-          so a chromatic run walks the whole catalogue of figures in order. it is not a pitch — the
-          rungs are however far apart the plate's own resonances happen to be, which is the point.
-          notes past the top of the ladder hold at the highest one, and changing the plate re-ranks
-          everything under your fingers.<br><br>
+            <b>notes → resonances</b> lets you play the plate from a keyboard. the <b>lowest note</b>
+          plays the plate's lowest mode, and each semitone above it moves one mode up the list, so a
+          chromatic scale steps through all the figures in order. the result is not in tune: the steps
+          are as far apart as the plate's modes are, not semitones. notes above the top of the list
+          stay on the highest mode, and changing the plate changes which mode each key plays.<br><br>
           <b>lo / hi</b> set the range the full 0–127 sweep covers — invert them to reverse the knob.
           <b>smoothing</b> interpolates between 7-bit steps so sweeps do not stair-step.<br><br>
           a mapping only holds a parameter while a cc is actually moving it. once the sweep
@@ -1056,16 +1092,21 @@
       <div id="params-export"></div>
       <div class="btnrow" style="margin-bottom:6px">
         <button class="act" id="btn-png">export png</button>
+        <button class="act" id="btn-svg">export svg</button>
       </div>
       <div class="btnrow">
         <button class="act primary" id="btn-rec">● record video</button>
       </div>
       <div class="hint" id="i-export">
-        the frame aspect letterboxes the canvas to a fixed ratio — png and video capture exactly that
-        region, so nothing is cropped afterwards.<br><br>
-        <b>capture resolution</b> renders the recording off-screen at full size regardless of window
-        size. webm/vp9 at a high bitrate is far cleaner than the default; grain-heavy frames are hard
-        to compress, so raise the bitrate if you still see mush.
+        the frame aspect letterboxes the view to a fixed ratio. png, svg and video capture exactly
+        that area, so nothing needs cropping afterwards.<br><br>
+        <b>export svg</b> writes vectors. in the grains style every grain becomes a dot; in the
+        smooth styles the curves are traced from the field. nodal lines and contours export as
+        drawn. density and liquid are shading, which has no vector equivalent, so they export their
+        nodal lines. the grains style's field shading is not included.<br><br>
+        <b>capture resolution</b> renders the video off-screen at that size, independent of the
+        window. webm/vp9 at a high bitrate is much cleaner than the default. frames full of grains
+        are hard to compress, so raise the bitrate if the result looks smeared.
       </div>
     </div>
 
@@ -1091,42 +1132,41 @@
       <h2>About <span class="tag">read me</span></h2>
       <div class="foldbody">
         <div class="hint open" style="margin-top:0">
-          <b>What is this?</b><br>
-          A Chladni plate is a flat sheet of metal with sand on it. Vibrate it at the right pitch and
-          the sand stops being a mess and snaps into a sharp geometric pattern. Ernst Chladni was doing
-          this in 1787; Napoleon watched it and put up prize money.<br><br>
+          <b>What this is</b><br>
+          A Chladni plate is a thin metal plate with sand sprinkled on it. When the plate vibrates at
+          one of its resonant frequencies, the sand collects along lines and forms a pattern. Ernst
+          Chladni published drawings of these figures in 1787.<br><br>
 
-          <b>Why does the sand move?</b><br>
-          A vibrating plate does not go up and down all in one piece. Parts of it swing hard while other
-          parts barely move at all. The still lines are called <b>nodes</b>. Sand sitting on a violently
-          shaking part gets thrown around until it happens to land somewhere still — and then it stays.
-          So the sand is not drawing the vibration. It is drawing the places where there <i>is</i> no
-          vibration. Fine powder does the opposite: it is light enough for the moving air to carry, so it
-          piles up at the loudest spots instead.<br><br>
+          <b>Why the sand moves</b><br>
+          A vibrating plate doesn't move as one piece. Some regions move a lot, others hardly at all.
+          The lines that stay still are called <b>nodal lines</b>. Sand on a moving region is bounced
+          around until it reaches a nodal line, where nothing moves it further, so it collects there.
+          The pattern shows where the plate is <i>not</i> moving. Very fine powder behaves
+          differently: air currents above the plate carry it to the places that move most, the
+          <b>antinodes</b>.<br><br>
 
-          <b>What is a mode?</b><br>
-          A plate cannot vibrate in just any shape. Like a guitar string that will only give you its
-          fundamental and its overtones, a plate has a fixed catalogue of standing patterns it is willing
-          to hold — its <b>modes</b>. Each one has its own pitch. Play that pitch and that pattern
-          appears; play something in between and you mostly get mud. That is why sweeping a tone
-          generator across a plate is so dramatic: nothing, nothing, nothing — then suddenly a perfect
-          star.<br><br>
+          <b>Modes</b><br>
+          A plate can only vibrate steadily in certain shapes, called its <b>modes</b>, each with its
+          own frequency. A string works the same way, with its fundamental and overtones, but a
+          plate's modes are two-dimensional and not evenly spaced. Driving the plate at a mode's
+          frequency produces that mode's pattern. Between modes the response is weak and the sand
+          forms no clear figure, so a slow frequency sweep shows patterns only at particular
+          frequencies.<br><br>
 
-          <b>What decides the pitches?</b><br>
-          <b>Size</b> — bigger plates are lower, and steeply so: double the width and every pitch drops
-          by a factor of four.<br>
-          <b>Stiffness and thickness</b> — a thicker or stiffer plate is higher. Steel sings higher than
-          aluminium of the same size.<br>
-          <b>Shape and how it is held</b> — a square, a circle and a triangle have completely different
-          catalogues. Clamping the rim rather than letting it flap raises every pitch and changes every
-          pattern.<br><br>
+          <b>What sets the frequencies</b><br>
+          <b>Size</b>: frequency goes as 1/L², so doubling the width lowers every mode by two
+          octaves.<br>
+          <b>Thickness and material</b>: frequency rises in proportion to thickness, and with the
+          material's stiffness relative to its density.<br>
+          <b>Shape and edges</b>: a square, a disc and a triangle each have a different set of modes.
+          Clamping the edge instead of leaving it free raises every frequency and changes the
+          patterns.<br><br>
 
-          <b>What makes the patterns intricate?</b><br>
-          Sometimes two entirely different modes happen to share the same pitch — <b>degenerate</b>
-          modes. They both wake up at once and add together, and where you touch the plate to drive it
-          decides how they blend, so one frequency can give a whole family of figures. A driver sitting
-          exactly on a mode's node cannot wake it at all — which is why moving the drive point makes
-          half the catalogue vanish.
+          <b>Why some figures are complex</b><br>
+          Sometimes two different modes have the same frequency. These are <b>degenerate</b> modes:
+          both respond to the same drive and their shapes add. Where the plate is driven decides how
+          much of each you get, so one frequency can give several different figures. A driver placed
+          on a mode's nodal line cannot excite that mode at all.
         </div>
       </div>
     </div>
@@ -1563,7 +1603,11 @@ const UNIT_PARAMS = [
   { id: 'pthick', label: 'thickness',    min: 0.2, max: 5,   step: 0.05, value: 1,   dp: 2, unit: ' mm' },
 ];
 const DRIVE_PARAMS = [
-  { id: 'freq',     label: 'frequency',  min: 1,   max: 160, step: 0.05, value: 25,  dp: 2 },
+  { id: 'freq',     label: 'frequency',  min: 1,   max: 160, step: 0.05, value: 25,  dp: 2,
+    fmt: v => {
+      const lad = snapOn ? noteLadder() : [];
+      return lad.length ? (ladderIndex(v, lad) + 1) + '/' + lad.length + ' · ' + v.toFixed(2) : v.toFixed(2);
+    } },
   { id: 'q',        label: 'resonance q',min: 1,   max: 240, step: 0.5,  value: 60,  dp: 1 },
   { id: 'partials', label: 'partials',   min: 1,   max: 8,   step: 1,    value: 5,   dp: 0 },
   { id: 'tilt',     label: 'spectral tilt', min: -1.5, max: 1.5, step: 0.01, value: 0, dp: 2 },
@@ -1613,6 +1657,8 @@ const STYLE_PARAMS = [
   { id: 'lfill',  label: 'fill',        min: 0,   max: 1,    step: 0.005, value: 0.5, dp: 3 },
   { id: 'depth',  label: 'depth',       min: 0.1, max: 4,    step: 0.02, value: 1,    dp: 2 },
   { id: 'light',  label: 'light angle', min: 0,   max: 360,  step: 1,    value: 125,  dp: 0, unit: '°' },
+  { id: 'pgrid',  label: 'plate grid',  min: 0,   max: 48,   step: 1,    value: 18,   dp: 0,
+    fmt: v => v < 1 ? 'off' : v + ' cells' },
 ];
 const AUDIO_PARAMS = [
   { id: 'vol',    label: 'volume',         min: 0,   max: 1,  step: 0.005, value: 0.35, dp: 3 },
@@ -1648,6 +1694,8 @@ let fingers = [];                    // damping points, plate coords, max 4
 
 /* user colours */
 let colCanvas = '#0a0b0e';
+let colContour = '#3d6b9e', colNode = '#ffd173';      // contour style
+let colPlate = '#131418', colGrid = '#25282e';        // the plate under the liquid
 function hex2rgb(h) {
   const v = parseInt(h.slice(1), 16);
   return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
@@ -1817,11 +1865,14 @@ function sizeFactor() {
 function rescaleModes() {
   const k = sizeFactor();
   for (const m of catalogue) m.F = m.F0 * k;
-  // the ladder of distinct resonances, for snap-to-resonance and the wheel
+  // the ladder of distinct resonances, for stepping through modes and the wheel
   modeFreqs = [...new Set(catalogue.map(m => +m.F.toFixed(4)))].sort((a, b) => a - b);
+  // a new ladder can leave the drive between rungs, or outside a fitted range
+  if (paramById.freq && document.getElementById('in-freq')) setParam('freq', PB.freq);
 }
 
 let modeFreqs = [];
+let fitRange = false;
 
 /* the ladder the keyboard walks: only the resonances the frequency control can
    actually reach. a plate whose fundamental sits below the slider's floor (or
@@ -1832,15 +1883,77 @@ function noteLadder() {
   return modeFreqs.filter(f => f >= d.min && f <= d.max);
 }
 
-function snapFreq(v) {
-  if (!modeFreqs.length) return v;
-  let best = modeFreqs[0], bd = Math.abs(v - best);
-  for (let i = 1; i < modeFreqs.length; i++) {
-    const d = Math.abs(v - modeFreqs[i]);
-    if (d < bd) { bd = d; best = modeFreqs[i]; }
-    else if (modeFreqs[i] > v) break;              // sorted, so nothing closer follows
+function ladderIndex(v, lad) {
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < lad.length; i++) {
+    const d = Math.abs(v - lad[i]);
+    if (d < bd) { bd = d; best = i; }
+    else if (lad[i] > v) break;                    // sorted, so nothing closer follows
   }
   return best;
+}
+function snapFreq(v) {
+  const lad = noteLadder();
+  return lad.length ? lad[ladderIndex(v, lad)] : v;
+}
+
+/* the frequency slider's own axis. "step through modes" makes it a mode index,
+   one notch per resonance however close together or far apart they sit;
+   "resonant range" cuts it to the span from the lowest resonance to the highest.
+   P and PB always hold the frequency itself — only the slider changes meaning. */
+function freqBounds() {
+  const d = paramById.freq, lad = noteLadder();
+  return fitRange && lad.length ? [lad[0], lad[lad.length - 1]] : [d.min, d.max];
+}
+function paramSpan(d) {
+  if (d.id !== 'freq') return d.max - d.min;
+  const [lo, hi] = freqBounds();
+  return hi - lo;
+}
+function sliderSpec(id) {
+  const d = paramById[id];
+  if (id === 'freq') {
+    const lad = noteLadder();
+    if (snapOn && lad.length) return { min: 0, max: lad.length - 1, step: 1 };
+    const [lo, hi] = freqBounds();
+    return { min: lo, max: hi, step: d.step };
+  }
+  return { min: d.min, max: d.max, step: d.step };
+}
+function sliderPos(id, v) {
+  if (id === 'freq' && snapOn) {
+    const lad = noteLadder();
+    if (lad.length) return ladderIndex(v, lad);
+  }
+  return v;
+}
+function sliderVal(id, pos) {
+  if (id === 'freq' && snapOn) {
+    const lad = noteLadder();
+    if (lad.length) return lad[Math.min(lad.length - 1, Math.max(0, Math.round(pos)))];
+  }
+  return pos;
+}
+function syncSlider(id) {
+  const el = document.getElementById('in-' + id);
+  if (!el) return;
+  const sp = sliderSpec(id);
+  el.min = sp.min; el.max = sp.max; el.step = sp.step;
+  el.value = sliderPos(id, PB[id]);
+}
+// a cc's 0–1 onto the frequency: its lo / hi span cut to what the slider can
+// reach, and walked rung by rung while stepping through modes
+function unitToFreq(u, lo, hi) {
+  const [a, b] = freqBounds();
+  const l = Math.min(b, Math.max(a, lo)), h = Math.min(b, Math.max(a, hi));
+  if (snapOn) {
+    const lad = noteLadder().filter(f => f >= Math.min(l, h) - 1e-9 && f <= Math.max(l, h) + 1e-9);
+    if (lad.length) {
+      const i = Math.round(u * (lad.length - 1));
+      return lad[l <= h ? i : lad.length - 1 - i];
+    }
+  }
+  return l + u * (h - l);
 }
 
 // modal shape at an arbitrary point — mirrors the shader exactly
@@ -2137,7 +2250,7 @@ let evenFeed = true;
 let momentary = 0, held = false, presence = 1, lastPresence = 1;
 let pointerHeld = false;
 const notesHeld = new Set();
-let evenPtr = 0, evenAcc = 0;
+let evenPtr = 0, evenAcc = 0, evenLeft = 0, wasLive = true;
 function gateOpen() { return !momentary || held; }
 function setHeld() {
   const h = pointerHeld || notesHeld.size > 0;
@@ -2194,9 +2307,16 @@ function stepGrains(dt) {
   if (presence > lastPresence) revive(lastPresence, presence);
   lastPresence = presence;
   if (!live) {                   // silent plate: nothing crawls
-    if (momentary === 2) evenOut(dt);
+    if (momentary === 2) {
+      // one pass of the even spread per release, then the jitter keeps it moving
+      if (wasLive) { evenLeft = grainCount; evenAcc = 0; }
+      evenOut(dt);
+      if (P.jitter > 0) shakeGrains(0, grainCount, dt);
+    }
+    wasLive = false;
     return;
   }
+  wasLive = true;
 
   // continuous feed: recycle grains back onto the plate oldest-first, so the
   // population keeps turning over instead of settling once and freezing
@@ -2254,13 +2374,14 @@ function ensureEven(n) {
   }
 }
 // released in noise mode: a cursor walks the population putting each grain on
-// its even spot, a whole turnover every 1 / (feed + kill) seconds
+// its even spot, a whole turnover in 1 / (feed + kill) seconds, once
 function evenOut(dt) {
+  if (evenLeft <= 0) return;
   ensureEven(grainCount);
   evenAcc += (P.feed + P.kill) * grainCount * dt;
-  const whole = Math.min(grainCount, Math.floor(evenAcc));
+  const whole = Math.min(evenLeft, Math.floor(evenAcc));
   evenAcc -= whole;
-  if (evenAcc > grainCount) evenAcc = 0;
+  evenLeft -= whole;
   for (let j = 0; j < whole; j++) {
     const i = evenPtr++ % grainCount;
     gpos[i * 2] = evenTab[i * 2]; gpos[i * 2 + 1] = evenTab[i * 2 + 1];
@@ -2284,6 +2405,44 @@ function recycleRange(lo, hi, slot, dt) {
   feedAcc[slot] -= whole;
   const recycle = Math.min(whole, n);
   for (let j = 0; j < recycle; j++) placeGrain(lo + (feedPtr[slot]++ % n));
+}
+
+// keep a grain on the plate: pull it in off the rim, reflect it off a straight edge
+function confine(ix, x, y, round, tri, inner) {
+  if (round) {
+    const cx = x * 2 - 1, cy = y * 2 - 1, r = Math.hypot(cx, cy);
+    if (r > 0.995)      { x = 0.5 + 0.5 * cx / r * 0.99;  y = 0.5 + 0.5 * cy / r * 0.99; }
+    else if (r < inner && r > 1e-6) {
+      const rr = inner * 1.005;
+      x = 0.5 + 0.5 * cx / r * rr; y = 0.5 + 0.5 * cy / r * rr;
+    }
+  } else if (tri) {
+    // reflect back across whichever of the three edges was crossed
+    for (let it = 0; it < 3; it++) {
+      if (y < 0) y = -y;
+      const dA = 2 * x - y;                        // edge y = 2x
+      if (dA < 0) { const s = 2 * dA / 5; x -= s * 2; y += s; }
+      const dB = 2 * x + y - 2;                    // edge y = 2 − 2x
+      if (dB > 0) { const s = 2 * dB / 5; x -= s * 2; y -= s; }
+      if (y >= 0 && 2 * x - y >= 0 && 2 * x + y - 2 <= 0) break;
+    }
+  } else {
+    if (x < 0) x = -x; else if (x > 1) x = 2 - x;
+    if (y < 0) y = -y; else if (y > 1) y = 2 - y;
+  }
+  gpos[ix] = x; gpos[ix + 1] = y;
+}
+
+/* the released plate in noise mode: no drive, so no crawl, but every grain
+   bounces by the jitter amount as if the whole plate were shaken evenly —
+   the figure dissolves into a moving spread rather than a still one */
+function shakeGrains(lo, hi, dt) {
+  const j = P.jitter * 1.8 * dt;
+  const round = geom === 'disc' || geom === 'ring', tri = geom === 'tri', inner = ringInner();
+  for (let i = lo; i < hi; i++) {
+    const ix = i * 2;
+    confine(ix, gpos[ix] + (Math.random() - 0.5) * j, gpos[ix + 1] + (Math.random() - 0.5) * j, round, tri, inner);
+  }
 }
 
 // dir −1 crawls down the amplitude gradient (sand → nodes), +1 up it (powder → antinodes)
@@ -2313,29 +2472,7 @@ function moveGrains(lo, hi, dir, dt) {
       x += dir * (gx / gm) * speed * mob + (Math.random() - 0.5) * j;
       y += dir * (gy / gm) * speed * mob + (Math.random() - 0.5) * j;
     }
-
-    if (round) {
-      const cx = x * 2 - 1, cy = y * 2 - 1, r = Math.hypot(cx, cy);
-      if (r > 0.995)      { x = 0.5 + 0.5 * cx / r * 0.99;  y = 0.5 + 0.5 * cy / r * 0.99; }
-      else if (r < inner && r > 1e-6) {
-        const rr = inner * 1.005;
-        x = 0.5 + 0.5 * cx / r * rr; y = 0.5 + 0.5 * cy / r * rr;
-      }
-    } else if (tri) {
-      // reflect back across whichever of the three edges was crossed
-      for (let it = 0; it < 3; it++) {
-        if (y < 0) y = -y;
-        const dA = 2 * x - y;                        // edge y = 2x
-        if (dA < 0) { const s = 2 * dA / 5; x -= s * 2; y += s; }
-        const dB = 2 * x + y - 2;                    // edge y = 2 − 2x
-        if (dB > 0) { const s = 2 * dB / 5; x -= s * 2; y -= s; }
-        if (y >= 0 && 2 * x - y >= 0 && 2 * x + y - 2 <= 0) break;
-      }
-    } else {
-      if (x < 0) x = -x; else if (x > 1) x = 2 - x;
-      if (y < 0) y = -y; else if (y > 1) y = 2 - y;
-    }
-    gpos[ix] = x; gpos[iy] = y;
+    confine(ix, x, y, round, tri, inner);
   }
 }
 
@@ -2407,6 +2544,8 @@ const PANEL_W = parseFloat(getComputedStyle(document.documentElement)
                   .getPropertyValue('--panel-w')) || 322;
 // css px the pinned-controls row takes off the foot of the view (0 with no pins)
 let dockReserve = 0;
+// and the spectrum bar off the top (0 while the readout lives in the panel)
+let topReserve = 0;
 
 function computeFrame() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -2416,7 +2555,9 @@ function computeFrame() {
   // would otherwise give a negative frame — and a negative gl.scissor
   // the dock is a row of the view, not a lid on it: the plate is fitted above it
   const dockH = capturing ? 0 : Math.min(H * 0.5, dockReserve * dpr);
-  const availW = Math.max(1, W - panelW), availH = Math.max(1, H - dockH);
+  // likewise the spectrum bar across the top, when it is shown there
+  const topH = capturing ? 0 : Math.min(H * 0.4, topReserve * dpr);
+  const availW = Math.max(1, W - panelW), availH = Math.max(1, H - dockH - topH);
   const a = capturing ? 0 : aspectValue();
   let fw = availW, fh = availH;
   if (a > 0) {
@@ -2580,6 +2721,9 @@ uniform int   uStyle;       // 0 lines, 1 density, 2 contours, 3 liquid
 uniform int   uMat;         // 0 chrome, 1 gloss, 2 water
 uniform int   uPal;
 uniform vec3  uBg, uTint;
+uniform vec3  uContour, uNode;   // contour rings and the nodal lines among them
+uniform vec3  uPlateCol, uGridCol;
+uniform float uGrid;             // grid cells across the plate's short side, 0 for none
 uniform float uLineW, uSoft, uLevels, uFill, uDepth;
 uniform vec2  uLight;       // key light direction on screen
 uniform vec2  uDrive;
@@ -2606,14 +2750,38 @@ float sfld(vec2 q) {
   float v = mix(texture(uOld, q).g, texture(uNew, q).g, uBlend);
   return uEnc == 1 ? v * 2.0 - 1.0 : v;
 }
-float rho(vec2 q) { return exp(-fld(q) / uSoft); }
 float thresh() { return mix(0.94, 0.22, uFill); }
-// liquid lying in a channel has a round cross-section: 0 at the shore, 1 on the crest
-float height(vec2 q) {
-  float t = thresh();
-  float h = clamp((rho(q) - t) / (1.0 - t), 0.0, 1.0);
-  return sqrt(h * (2.0 - h));
+
+/* the liquid reads the field through a cubic b-spline. bilinear filtering has a
+   piecewise-constant gradient, and every reflection shows it as facets; the
+   b-spline is smooth to the second derivative. four bilinear taps give the
+   sixteen-texel kernel. */
+vec2 cubicR(sampler2D t, vec2 uv) {
+  vec2 ts = vec2(textureSize(t, 0));
+  vec2 p = uv * ts - 0.5;
+  vec2 i = floor(p), f = p - i;
+  vec2 f2 = f * f, f3 = f2 * f;
+  vec2 w0 = (-f3 + 3.0 * f2 - 3.0 * f + 1.0) / 6.0;
+  vec2 w1 = (3.0 * f3 - 6.0 * f2 + 4.0) / 6.0;
+  vec2 w2 = (-3.0 * f3 + 3.0 * f2 + 3.0 * f + 1.0) / 6.0;
+  vec2 w3 = f3 / 6.0;
+  vec2 s0 = w0 + w1, s1 = w2 + w3;
+  vec2 c0 = (i - 0.5 + w1 / s0) / ts, c1 = (i + 1.5 + w3 / s1) / ts;
+  float a = texture(t, c0).r, b = texture(t, vec2(c1.x, c0.y)).r;
+  float c = texture(t, vec2(c0.x, c1.y)).r, d = texture(t, c1).r;
+  return vec2(mix(mix(d, c, s0.x), mix(b, a, s0.x), s0.y), 0.0);
 }
+float fldL(vec2 q) {
+  float v = mix(cubicR(uOld, q).x, cubicR(uNew, q).x, uBlend);
+  return uEnc == 1 ? 2.0 * v * v : v;
+}
+/* liquid sits where the amplitude is below the shore level — the same width the
+   density style's softness and fill give. across the channel the surface is a
+   parabola in the field, 1 on the crest and 0 at the shore: the rms is smooth in
+   its square, so the crest is round, and the shore meets the plate at a finite
+   angle instead of a vertical wall. negative outside the liquid. */
+float shore() { return uSoft * -log(thresh()); }
+float heightRaw(vec2 q) { float u = fldL(q) / shore(); return 1.0 - u * u; }
 
 // a studio around the plate: dim surround, one soft key, a strip light opposite
 vec3 env(vec3 R) {
@@ -2629,13 +2797,14 @@ vec3 env(vec3 R) {
   return c;
 }
 
-// a ruled plate surface, so clear liquid has something to bend
-vec3 plateSurface(vec2 q, vec3 base) {
-  vec2 g = q * uPlate / uSide * 18.0;
+// the plate under the liquid, ruled so clear liquid has something to bend
+vec3 plateSurface(vec2 q) {
+  if (uGrid < 0.5) return uPlateCol;
+  vec2 g = q * uPlate / uSide * uGrid;
   vec2 fw = fwidth(g) + 1e-5;
   vec2 d = abs(fract(g - 0.5) - 0.5) / fw;
   float line = 1.0 - min(min(d.x, d.y), 1.0);
-  return base + vec3(0.07, 0.075, 0.085) * line;
+  return mix(uPlateCol, uGridCol, line);
 }
 
 void main() {
@@ -2676,19 +2845,22 @@ void main() {
   } else if (uStyle == 1) {
     col = palette(uPal, exp(-v / uSoft));
   } else if (uStyle == 2) {
-    col = mix(uBg, palette(uPal, v), 0.32);
+    col = mix(uBg, vec3(1.0), 0.035);                     // the same bare plate as nodal lines
     float x = v * uLevels;
     float g = abs(fract(x - 0.5) - 0.5) / max(fwv, 1e-6);
     float cl = 1.0 - smoothstep(uLineW * 0.35 - 0.5, uLineW * 0.35 + 0.5, g);
-    col = mix(col, palette(uPal, -1.0), cl * 0.85 * step(0.5, x));
+    col = mix(col, uContour, cl * 0.85 * step(0.5, x));
     float node = 1.0 - smoothstep(uLineW * 0.8 - 0.6, uLineW * 0.8 + 0.6, dn);
-    col = mix(col, palette(uPal, 1.0), node);
+    col = mix(col, uNode, node);
   } else {
     // ---- liquid ----
     vec2 dx = vec2(uTexel.x, 0.0), dy = vec2(0.0, uTexel.y);
-    float h  = height(q);
-    float hx = (height(q + dx) - height(q - dx)) / (2.0 * dx.x * uPlate.x);
-    float hy = (height(q + dy) - height(q - dy)) / (2.0 * dy.y * uPlate.y);
+    float hr = heightRaw(q);
+    float h  = max(hr, 0.0);
+    float hxp = max(heightRaw(q + dx), 0.0), hxm = max(heightRaw(q - dx), 0.0);
+    float hyp = max(heightRaw(q + dy), 0.0), hym = max(heightRaw(q - dy), 0.0);
+    float hx = (hxp - hxm) / (2.0 * dx.x * uPlate.x);
+    float hy = (hyp - hym) / (2.0 * dy.y * uPlate.y);
     float hs = uDepth * uSide * 0.012;                   // crest height in pixels
     vec2 sl = vec2(hx, hy) * hs;
     float sm = length(sl);
@@ -2701,17 +2873,15 @@ void main() {
     float fres = 0.04 + 0.96 * pow(1.0 - max(N.z, 0.0), 5.0);
     float spec = pow(max(dot(N, normalize(L + V)), 0.0), 110.0);
 
-    float r0 = rho(q), t = thresh();
-    float w = max(fwidth(r0), 1e-4) * 0.8;
-    float cover = smoothstep(t - w, t + w, r0);
+    float w = max(fwidth(hr), 1e-4) * 0.8;
+    float cover = smoothstep(-w, w, hr);
 
     // the beads throw a soft shadow away from the key light
     vec2 lp = vec2(cr * uLight.x + sr * uLight.y, -sr * uLight.x + cr * uLight.y);
     vec2 off = lp * hs * 0.9 / uPlate;
-    float shadow = smoothstep(t - 0.12, t + 0.02, rho(q - off)) * 0.5;
+    float shadow = smoothstep(-0.6, 0.05, heightRaw(q - off)) * 0.5;
 
-    vec3 plateCol = mix(uBg, vec3(0.10, 0.105, 0.12), 0.6);
-    if (uMat == 2) plateCol = plateSurface(q, plateCol);
+    vec3 plateCol = plateSurface(q);
     plateCol *= 1.0 - shadow * (1.0 - cover);
 
     vec3 liq;
@@ -2722,8 +2892,8 @@ void main() {
       liq = uTint * (0.14 + 0.78 * diff) + env(R) * fres * 0.9 + vec3(spec * 1.3);
     } else {
       vec2 qr = q + N.xy * uDepth * 0.025 * h;            // refraction through the bead
-      vec3 under = plateSurface(qr, mix(uBg, vec3(0.10, 0.105, 0.12), 0.6));
-      float lap = height(q + dx) + height(q - dx) + height(q + dy) + height(q - dy) - 4.0 * h;
+      vec3 under = plateSurface(qr);
+      float lap = hxp + hxm + hyp + hym - 4.0 * h;
       float caustic = clamp(-lap * 6.0, 0.0, 1.0);
       liq = under * vec3(0.82, 0.93, 1.0) + vec3(0.55, 0.8, 1.0) * caustic * 0.35
           + env(R) * fres + vec3(spec * 1.5);
@@ -2759,6 +2929,7 @@ const uR = uniformsOf(progRms, ['uMode', 'uCount', 'uNH', 'uAmp', 'uNorm', 'uSiz
 const uM = uniformsOf(progMix, ['uOld', 'uNew', 'uT', 'uSize']);
 const uS = uniformsOf(progStyle, ['uOld', 'uNew', 'uBlend', 'uEnc', 'uTexel', 'uOrigin', 'uPlate', 'uSide', 'uRot',
   'uStyle', 'uMat', 'uPal', 'uBg', 'uTint', 'uLineW', 'uSoft', 'uLevels', 'uFill', 'uDepth', 'uLight',
+  'uContour', 'uNode', 'uPlateCol', 'uGridCol', 'uGrid',
   'uDrive', 'uShowDrive', 'uFinger', 'uFingerN', 'uProf', 'uGeom', 'uInner']);
 
 // a float render target when the browser has one; otherwise 8 bits, sqrt-encoded
@@ -2994,6 +3165,11 @@ function drawStyled(dt, bg) {
   gl.uniform3f(uS.uBg, bg[0], bg[1], bg[2]);
   const tc = coarseRgb();
   gl.uniform3f(uS.uTint, tc[0], tc[1], tc[2]);
+  gl.uniform3fv(uS.uContour, hex2rgb(colContour));
+  gl.uniform3fv(uS.uNode, hex2rgb(colNode));
+  gl.uniform3fv(uS.uPlateCol, hex2rgb(colPlate));
+  gl.uniform3fv(uS.uGridCol, hex2rgb(colGrid));
+  gl.uniform1f(uS.uGrid, P.pgrid);
   gl.uniform1f(uS.uLineW, P.linew * dprEff);
   gl.uniform1f(uS.uSoft, P.soft);
   gl.uniform1f(uS.uLevels, P.levels);
@@ -3023,8 +3199,10 @@ function updateStyleUI() {
   disp_(byId('smoothsub'), style === 'smooth');
   disp_(byId('liquidmat'), style === 'liquid');
   const sm = style === 'smooth', lq = style === 'liquid';
+  disp_(byId('contourcols'), sm && smoothSub === 'contours');
+  disp_(byId('platecols'), lq);
   const show = { morph: !grains, linew: sm && smoothSub !== 'density', soft: (sm && smoothSub === 'density') || lq,
-                 levels: sm && smoothSub === 'contours', lfill: lq, depth: lq, light: lq };
+                 levels: sm && smoothSub === 'contours', lfill: lq, depth: lq, light: lq, pgrid: lq };
   Object.keys(show).forEach(k => disp_(byId('param-' + k), show[k]));
   document.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === style));
   document.querySelectorAll('[data-sub]').forEach(b => b.classList.toggle('active', b.dataset.sub === smoothSub));
@@ -3197,8 +3375,15 @@ function nudgeParam(id, dir, big) {
   if (inp && inp.disabled) return;
   // quantise onto the parameter's own grid, not the shift-multiplied one, so a
   // big jump from an off-grid value still moves by the full ten notches
+  if (id === 'freq' && snapOn) return stepLadder(dir * (big ? 10 : 1));
   const step = d.step * (big ? 10 : 1);
   setParam(id, Math.round((PB[id] + dir * step) / d.step) * d.step);
+}
+function stepLadder(n) {
+  const lad = noteLadder();
+  if (!lad.length) return;
+  const i = ladderIndex(PB.freq, lad) + n;
+  setParam('freq', lad[Math.min(lad.length - 1, Math.max(0, i))]);
 }
 
 function buildParamRows(list, container) {
@@ -3214,12 +3399,13 @@ function buildParamRows(list, container) {
     container.appendChild(wrap);
     const input = wrap.querySelector('input');
     input.title = 'double-click to reset to ' + (d.fmt ? d.fmt(d.value) : d.value);
-    input.addEventListener('input', () => setParam(d.id, parseFloat(input.value), false));
+    input.addEventListener('input', () => setParam(d.id, sliderVal(d.id, parseFloat(input.value)), false));
     // d.value is the declared default and is never written to, so it stays a true default
     input.addEventListener('dblclick', () => setParam(d.id, d.value));
     wrap.addEventListener('pointerdown', () => selectParam(d.id));
     input.addEventListener('focus', () => selectParam(d.id));
     refreshParamUI(d.id);
+    syncSlider(d.id);
   }
 }
 
@@ -3250,7 +3436,8 @@ let solveQueued = false;
 
 function clampP(d, v) {
   if (!Number.isFinite(v)) v = d.value;
-  v = Math.min(d.max, Math.max(d.min, v));
+  const [lo, hi] = d.id === 'freq' ? freqBounds() : [d.min, d.max];
+  v = Math.min(hi, Math.max(lo, v));
   if (d.step >= 1) v = Math.round(v);
   return v;
 }
@@ -3262,8 +3449,7 @@ function setParam(id, value, updateSlider = true) {
   if (id === 'freq' && snapOn) value = snapFreq(value);
   value = clampP(d, value);
   PB[id] = value;
-  const slider = document.getElementById('in-' + id);
-  if (updateSlider && slider) slider.value = value;
+  if (updateSlider) syncSlider(id);
   applyMod(id);
 }
 
@@ -3271,7 +3457,9 @@ function setParam(id, value, updateSlider = true) {
 function applyMod(id, quiet) {
   const d = paramById[id];
   if (!d) return;
-  const v = clampP(d, PB[id] + (modOffset[id] || 0));
+  let v = clampP(d, PB[id] + (modOffset[id] || 0));
+  // an lfo on a stepped frequency jumps from figure to figure
+  if (id === 'freq' && snapOn && modOffset[id]) v = snapFreq(v);
   if (v === P[id]) { if (!quiet) refreshParamUI(id); return; }
   P[id] = v;
   if (!quiet) refreshParamUI(id);
@@ -3353,7 +3541,7 @@ function tickLfo(dt, now) {
       if (!a.key) continue;
       live = true;
       const d = paramById[a.key];
-      if (d) next[a.key] = (next[a.key] || 0) + l.out * a.amt * 0.5 * (d.max - d.min);
+      if (d) next[a.key] = (next[a.key] || 0) + l.out * a.amt * 0.5 * paramSpan(d);
       else if (MAP_TARGETS[a.key] && MAP_TARGETS[a.key].steps)
         enums[a.key] = (enums[a.key] || 0) + l.out * a.amt;
     }
@@ -3679,6 +3867,28 @@ document.getElementById('modelist').addEventListener('click', e => {
 /* ---- spectrum readout ---- */
 const specCv = document.getElementById('spectrum');
 const sctx = specCv.getContext('2d');
+/* the readout can sit in the drive section or in a bar across the top of the
+   plate view. it is the same canvas either way, moved between the two; the
+   plate is fitted below the bar the same way it is fitted above the dock. */
+let specTop = false;
+const specTopEl = document.getElementById('spec-top');
+const specHome = document.createComment('spectrum');
+specCv.before(specHome);
+function fitSpecTop() {
+  const r = specTop ? specTopEl.offsetTop + specTopEl.offsetHeight + 10 : 0;
+  if (r !== topReserve) { topReserve = r; computeFrame(); }
+}
+function setSpecTop(on) {
+  specTop = !!on;
+  if (specTop) specTopEl.appendChild(specCv); else specHome.after(specCv);
+  specTopEl.hidden = !specTop;
+  document.getElementById('btn-spectop').classList.toggle('active', specTop);
+  fitSpecTop();
+  drawSpectrum();
+}
+document.getElementById('btn-spectop').addEventListener('click', () => setSpecTop(!specTop));
+if (window.ResizeObserver) new ResizeObserver(() => { if (specTop) { fitSpecTop(); drawSpectrum(); } }).observe(specTopEl);
+
 function drawSpectrum() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = specCv.clientWidth || 256, h = 76;
@@ -3686,7 +3896,8 @@ function drawSpectrum() {
   sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   sctx.clearRect(0, 0, w, h);
 
-  const fmax = Math.max(160, P.freq * (spec.length ? spec[spec.length - 1].n : 1) * 1.1);
+  // the axis spans the slider's reach, so a fitted range fills the strip
+  const fmax = Math.max(freqBounds()[1], P.freq * (spec.length ? spec[spec.length - 1].n : 1) * 1.1);
 
   // mode frequencies as faint ticks — you can see partials hunting for resonances
   sctx.strokeStyle = 'rgba(255,255,255,0.22)';
@@ -3777,11 +3988,9 @@ canvas.addEventListener('pointercancel', releasePlate);
 canvas.addEventListener('lostpointercapture', releasePlate);
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  if (snapOn && modeFreqs.length) {
-    // snapped, a proportional nudge would land on the same mode — step the ladder instead
-    const i = modeFreqs.indexOf(snapFreq(PB.freq));
-    const j = Math.min(modeFreqs.length - 1, Math.max(0, i + (e.deltaY > 0 ? -1 : 1)));
-    setParam('freq', modeFreqs[j]);
+  if (snapOn && noteLadder().length) {
+    // stepping, a proportional nudge would land on the same mode — step the ladder instead
+    stepLadder(e.deltaY > 0 ? -1 : 1);
   } else {
     setParam('freq', PB.freq * (e.deltaY > 0 ? 0.985 : 1.015));
   }
@@ -3893,7 +4102,14 @@ const btnSnap = document.getElementById('btn-snap');
 btnSnap.addEventListener('click', () => {
   snapOn = !snapOn;
   btnSnap.classList.toggle('active', snapOn);
-  if (snapOn) setParam('freq', PB.freq);        // land on the nearest resonance at once
+  setParam('freq', PB.freq);        // land on the nearest resonance, and re-axis the slider
+});
+const btnFit = document.getElementById('btn-fitrange');
+btnFit.addEventListener('click', () => {
+  fitRange = !fitRange;
+  btnFit.classList.toggle('active', fitRange);
+  setParam('freq', PB.freq);
+  drawSpectrum();
 });
 const btnRealHz = document.getElementById('btn-realhz');
 btnRealHz.addEventListener('click', () => {
@@ -3906,6 +4122,16 @@ btnRealHz.addEventListener('click', () => {
   updateAudio();
 });
 
+// back to the starting position: the accumulated spin, the angle offset and the
+// spin rate all go to zero, so the plate stays where it lands
+function resetRotation() {
+  plateRot = 0;
+  setParam('rotspd', 0);
+  setParam('rotang', 0);
+  computeFrame();
+}
+document.getElementById('btn-rothome').addEventListener('click', resetRotation);
+
 const btnGrains = document.getElementById('btn-grains');
 btnGrains.addEventListener('click', () => { showGrains = !showGrains; btnGrains.classList.toggle('active', showGrains); });
 const btnDriver = document.getElementById('btn-driver');
@@ -3914,6 +4140,10 @@ document.getElementById('btn-reseed').addEventListener('click', scatterGrains);
 
 /* ---- colours ---- */
 document.getElementById('col-canvas').addEventListener('input', e => { colCanvas = e.target.value; });
+document.getElementById('col-contour').addEventListener('input', e => { colContour = e.target.value; });
+document.getElementById('col-node').addEventListener('input', e => { colNode = e.target.value; });
+document.getElementById('col-plate').addEventListener('input', e => { colPlate = e.target.value; });
+document.getElementById('col-grid').addEventListener('input', e => { colGrid = e.target.value; });
 
 const btnPause = document.getElementById('btn-pause');
 btnPause.addEventListener('click', () => { paused = !paused; btnPause.classList.toggle('armed', paused); btnPause.textContent = paused ? 'resume' : 'pause'; });
@@ -4009,7 +4239,7 @@ const presets = [
 ];
 function applyPreset(p) {
   geom = p.geom; edge = p.edge; waveform = p.wave;
-  if (snapOn) { snapOn = false; btnSnap.classList.remove('active'); }   // presets name exact frequencies
+  if (snapOn) { snapOn = false; btnSnap.classList.remove('active'); syncSlider('freq'); }   // presets name exact frequencies
   document.getElementById('geom').value = geom;
   document.getElementById('wave').value = waveform;
   // shape params must land before the catalogue is built from them
@@ -4053,10 +4283,12 @@ function snapshotPatch() {
     version: 1,
     saved: new Date().toISOString(),
     plate:  { geom, edge, disp, material },
-    drive:  { waveform, snap: snapOn },
+    drive:  { waveform, snap: snapOn, fitRange },
     grains: { medium, evenFeed, momentary },
     render: { field: fieldMode, palette, grains: showGrains, driver: showDrive, canvas: colCanvas,
-              style, smooth: smoothSub, liquid: liqMat },
+              style, smooth: smoothSub, liquid: liqMat,
+              contourCol: colContour, nodeCol: colNode, plateCol: colPlate, gridCol: colGrid,
+              specTop },
     audio:  { realHz },
     frame:  { aspect: document.getElementById('aspect').value,
               capres: document.getElementById('capres').value },
@@ -4079,8 +4311,11 @@ function applyPatch(s) {
   const pl = s.plate || {}, dr = s.drive || {}, gr = s.grains || {};
   const rn = s.render || {}, au = s.audio || {}, fr = s.frame || {};
 
-  /* 1. base parameter values, before anything is rebuilt from them */
+  /* 1. base parameter values, before anything is rebuilt from them. the stored
+        frequency is clamped to its hard limits here; a fitted range belongs to
+        the plate being replaced, and is re-applied once the new one is built */
   modOffset = {};
+  fitRange = false;
   const src = s.params || {};
   for (const k in src) {
     const d = paramById[k];
@@ -4100,10 +4335,15 @@ function applyPatch(s) {
   document.getElementById('material').value = material;
   document.querySelectorAll('[data-disp]').forEach(x => x.classList.toggle('active', x.dataset.disp === disp));
 
-  if (typeof rn.canvas === 'string' && /^#[0-9a-f]{6}$/i.test(rn.canvas)) {
+  const isHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+  if (isHex(rn.canvas)) {
     colCanvas = rn.canvas;
     document.getElementById('col-canvas').value = colCanvas;
   }
+  if (isHex(rn.contourCol)) document.getElementById('col-contour').value = colContour = rn.contourCol;
+  if (isHex(rn.nodeCol))    document.getElementById('col-node').value    = colNode    = rn.nodeCol;
+  if (isHex(rn.plateCol))   document.getElementById('col-plate').value   = colPlate   = rn.plateCol;
+  if (isHex(rn.gridCol))    document.getElementById('col-grid').value    = colGrid    = rn.gridCol;
   if (Number.isInteger(rn.palette) && rn.palette >= 0 && rn.palette <= 3) {
     palette = rn.palette;
     document.getElementById('palette').value = String(palette);
@@ -4121,6 +4361,9 @@ function applyPatch(s) {
   // snap is set directly: clicking it would re-quantise a frequency the patch
   // already stores exactly, against a catalogue that has not been rebuilt yet
   if (typeof dr.snap === 'boolean') { snapOn = dr.snap; btnSnap.classList.toggle('active', snapOn); }
+  fitRange = dr.fitRange === true;
+  btnFit.classList.toggle('active', fitRange);
+  if (typeof rn.specTop === 'boolean') setSpecTop(rn.specTop);
   if (rn.field === 0 || rn.field === 1 || rn.field === 2) setField(rn.field);
   // patches from before the smooth styles load as grains
   setSmoothSub(SUB_KEYS.includes(rn.smooth) ? rn.smooth : 'lines');
@@ -4172,11 +4415,7 @@ function applyPatch(s) {
   updateEdgeButtons();
   updateDriveEnable();
   buildCatalogue();
-  Object.keys(PB).forEach(k => {
-    const el = document.getElementById('in-' + k);
-    if (el) el.value = PB[k];
-    applyMod(k);
-  });
+  Object.keys(PB).forEach(k => { syncSlider(k); applyMod(k); });
   solveModes(); scatterGrains();
   computeFrame(); drawSpectrum(); updateTags(); updateUnits();
   updateSwatches(); updateExportTag(); updateLfoMeters();
@@ -4277,8 +4516,14 @@ MAP_TARGETS['_grains'] = { label: 'grains on / off', toggle: true,
   apply: on => { if (on !== showGrains) document.getElementById('btn-grains').click(); } };
 MAP_TARGETS['_pause'] = { label: 'pause', toggle: true,
   apply: on => { if (on !== paused) document.getElementById('btn-pause').click(); } };
-MAP_TARGETS['_snap'] = { label: 'snap to resonance', toggle: true,
+MAP_TARGETS['_snap'] = { label: 'step through modes', toggle: true,
   apply: on => { if (on !== snapOn) btnSnap.click(); } };
+MAP_TARGETS['_fitrange'] = { label: 'resonant range', toggle: true,
+  apply: on => { if (on !== fitRange) btnFit.click(); } };
+MAP_TARGETS['_spectop'] = { label: 'spectrum above plate', toggle: true,
+  apply: on => { if (on !== specTop) setSpecTop(on); } };
+MAP_TARGETS['_rothome'] = { label: 'reset rotation (trigger)', toggle: true,
+  apply: on => { if (on) resetRotation(); } };
 MAP_TARGETS['_realhz'] = { label: 'audio: real hz', toggle: true,
   apply: on => { if (on !== realHz) btnRealHz.click(); } };
 MAP_TARGETS['_notes'] = { label: 'notes → resonances', toggle: true,
@@ -4415,7 +4660,7 @@ function tickMidi(dt) {
     m.smooth += (m.target - m.smooth) * k;
     const landed = Math.abs(m.target - m.smooth) < 1e-5;
     if (landed) m.smooth = m.target;
-    t.apply(m.lo + m.smooth * (m.hi - m.lo));
+    t.apply(m.key === 'freq' ? unitToFreq(m.smooth, m.lo, m.hi) : m.lo + m.smooth * (m.hi - m.lo));
     if (landed) m.target = undefined;
   });
 }
@@ -4560,6 +4805,7 @@ const MIDI_BTN_AT = {
   _geom: '#geom', _material: '#material', _edge: '[data-edge]', _disp: '[data-disp]',
   _field: '#fieldmode', _med3: '[data-med]', _momentary: '#momentary',
   _grains: '#btn-grains', _driver: '#btn-driver', _pause: '#btn-pause', _snap: '#btn-snap',
+  _fitrange: '#btn-fitrange', _spectop: '#btn-spectop', _rothome: '#btn-rothome',
   _realhz: '#btn-realhz', _notes: '#btn-midinotes', _scatter: '#btn-reseed', _fingers: '#btn-clearfingers',
 };
 function learnMapFor(key) { return midiMappings.find(m => m.id === mapLearnId && m.key === key); }
@@ -4759,6 +5005,195 @@ document.getElementById('btn-png').addEventListener('click', () => {
   a.download = 'chladni-' + Date.now() + '.png';
   a.href = c2.toDataURL('image/png');
   a.click();
+});
+
+/* ---- svg export ----
+   vectors rather than pixels: grains as dots, the smooth styles as curves. the
+   curves are traced on the cpu, by marching squares over the same field the gpu
+   draws: the rms for contour rings, the dominant harmonic's standing wave for
+   the nodal lines. density and liquid are shading, which has no vector form, so
+   they export their nodal lines. */
+const SVG_N = 320;                 // field samples across the plate box
+const PAL_HI = [[1.00, 0.82, 0.45], [0.62, 0.93, 1.00], [1.00, 0.62, 0.28], [1, 1, 1]];
+
+// the field on an (N+1)² vertex grid in plate coordinates; NaN off the plate
+function svgField(N) {
+  const cur = style !== 'grains';              // a smooth style shows the morphing amplitudes
+  const list = [];
+  for (const m of catalogue) {
+    const re = cur && m.are ? m.are : m.tre, im = cur && m.aim ? m.aim : m.tim;
+    if (!re) continue;
+    let e = 0;
+    for (let n = 0; n < NH; n++) e += re[n] * re[n] + im[n] * im[n];
+    if (e > 0) list.push({ m, re, im, e });
+  }
+  list.sort((a, b) => b.e - a.e);
+  const top = list.length ? list[0].e : 0;
+  const use = list.filter(x => x.e > top * 1e-6).slice(0, MAXMODES);
+  const S = N + 1, NN = S * S;
+  const acc = new Float32Array(NN * NH * 2);
+  const rms = new Float32Array(NN), sw = new Float32Array(NN);
+  const saa = new Float64Array(NH), sbb = new Float64Array(NH), sab = new Float64Array(NH);
+  let mx = 0;
+  for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+    const c = j * S + i, x = i / N, y = j / N;
+    if (!insidePlate(x, y)) { rms[c] = NaN; sw[c] = NaN; continue; }
+    const o = c * NH * 2;
+    for (const u of use) {
+      const w = shapeAt(u.m, x, y);
+      if (w === 0) continue;
+      for (let n = 0; n < NH; n++) { acc[o + n * 2] += u.re[n] * w; acc[o + n * 2 + 1] += u.im[n] * w; }
+    }
+    let e = 0;
+    for (let n = 0; n < NH; n++) {
+      const re = acc[o + n * 2], im = acc[o + n * 2 + 1];
+      e += re * re + im * im;
+      saa[n] += re * re; sbb[n] += im * im; sab[n] += re * im;
+    }
+    rms[c] = Math.sqrt(0.5 * e);
+    if (rms[c] > mx) mx = rms[c];
+  }
+  // the nodal lines come from one real standing wave, exactly as on screen
+  let ln = 0, best = -1;
+  for (let n = 0; n < NH; n++) if (saa[n] + sbb[n] > best) { best = saa[n] + sbb[n]; ln = n; }
+  const phi = 0.5 * Math.atan2(2 * sab[ln], saa[ln] - sbb[ln]);
+  const cp = Math.cos(phi), sp = Math.sin(phi);
+  for (let c = 0; c < NN; c++) {
+    if (Number.isNaN(rms[c])) continue;
+    rms[c] /= mx || 1;
+    sw[c] = acc[c * NH * 2 + ln * 2] * cp + acc[c * NH * 2 + ln * 2 + 1] * sp;
+  }
+  return { rms, sw };
+}
+
+/* iso-lines of f at one level. each crossing is keyed by the grid edge it sits
+   on, so segments from neighbouring cells meet exactly and chain into
+   polylines. returns an svg path in plate pixels (y up). */
+function isoPath(f, N, level, pw, ph) {
+  const S = N + 1, pt = new Map(), nb = new Map();
+  const at = (k, a, b, ia, ib) => {             // crossing on edge k between vertices ia, ib
+    if (!pt.has(k)) {
+      const t = (level - a) / (b - a);
+      const xa = ia % S, ya = (ia / S) | 0, xb = ib % S, yb = (ib / S) | 0;
+      pt.set(k, [(xa + (xb - xa) * t) / N * pw, (ya + (yb - ya) * t) / N * ph]);
+    }
+    return k;
+  };
+  const link = (a, b) => {
+    (nb.get(a) || nb.set(a, []).get(a)).push(b);
+    (nb.get(b) || nb.set(b, []).get(b)).push(a);
+  };
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const v0 = j * S + i, v1 = v0 + 1, v2 = v0 + S + 1, v3 = v0 + S;    // bl, br, tr, tl
+    const a = f[v0], b = f[v1], c = f[v2], d = f[v3];
+    if (Number.isNaN(a + b + c + d)) continue;
+    const A = a >= level, B = b >= level, C = c >= level, D = d >= level;
+    const e = [];
+    if (A !== B) e[0] = at(v0 * 2, a, b, v0, v1);          // bottom
+    if (B !== C) e[1] = at(v1 * 2 + 1, b, c, v1, v2);      // right
+    if (C !== D) e[2] = at(v3 * 2, d, c, v3, v2);          // top
+    if (D !== A) e[3] = at(v0 * 2 + 1, a, d, v0, v3);      // left
+    const n = e.filter(x => x !== undefined);
+    if (n.length === 2) link(n[0], n[1]);
+    else if (n.length === 4) {
+      // a saddle: the cell centre decides which corners are joined
+      if (((a + b + c + d) / 4 >= level) === A) { link(e[0], e[1]); link(e[2], e[3]); }
+      else { link(e[3], e[0]); link(e[1], e[2]); }
+    }
+  }
+  const used = new Set(), out = [];
+  const f1 = v => v.toFixed(1);
+  const walk = start => {
+    let prev = null, cur = start;
+    const p0 = pt.get(start);
+    let d = 'M' + f1(p0[0]) + ' ' + f1(p0[1]);
+    used.add(cur);
+    for (;;) {
+      const nx = (nb.get(cur) || []).find(k => k !== prev && !used.has(k));
+      if (nx === undefined) {
+        if ((nb.get(cur) || []).includes(start) && prev !== start && cur !== start) d += 'Z';
+        break;
+      }
+      const p = pt.get(nx);
+      d += 'L' + f1(p[0]) + ' ' + f1(p[1]);
+      used.add(nx); prev = cur; cur = nx;
+    }
+    out.push(d);
+  };
+  for (const [k, v] of nb) if (v.length === 1 && !used.has(k)) walk(k);   // open runs first
+  for (const k of nb.keys()) if (!used.has(k)) walk(k);                 // then closed loops
+  return out.join('');
+}
+
+function exportSvg() {
+  const [fx, fy, fw, fh] = frame_;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const pw = plate[0], ph = plate[1];
+  const cx = origin[0] + pw / 2 - fx, cy = fy + fh - (origin[1] + ph / 2);
+  const deg = plateAngle() * 180 / Math.PI;
+  const r2 = v => +v.toFixed(2);
+  const hex = c => '#' + c.map(v => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('');
+
+  let shape;
+  if (geom === 'rect') shape = '<rect width="' + r2(pw) + '" height="' + r2(ph) + '"/>';
+  else if (geom === 'tri') shape = '<path d="M0 0L' + r2(pw) + ' 0L' + r2(pw / 2) + ' ' + r2(ph) + 'Z"/>';
+  else {
+    const R = pw / 2, ri = ringInner() * R;
+    const circ = r => 'M' + r2(R - r) + ' ' + r2(R) + 'a' + r2(r) + ' ' + r2(r) + ' 0 1 0 ' + r2(2 * r) + ' 0a' + r2(r) + ' ' + r2(r) + ' 0 1 0 ' + r2(-2 * r) + ' 0Z';
+    shape = '<path fill-rule="evenodd" d="' + circ(R) + (ri > 0 ? circ(ri) : '') + '"/>';
+  }
+
+  const body = [];
+  const bg = hex2rgb(colCanvas);
+  if (style === 'grains') {
+    const dot = (lo, n, r, col) => {
+      if (n <= 0) return;
+      let d = '';
+      for (let i = lo; i < lo + n; i++) d += '<circle cx="' + (gpos[i * 2] * pw).toFixed(1) + '" cy="' + (gpos[i * 2 + 1] * ph).toFixed(1) + '" r="' + r + '"/>';
+      body.push('<g fill="' + hex(col) + '">' + d + '</g>');
+    };
+    if (showGrains) {
+      dot(0, shownCoarse(), r2(0.42 * P.gsize * dpr), coarseRgb());
+      dot(nCoarse, shownFine(), r2(0.42 * Math.max(1, P.gsize * 0.65) * dpr), fineRgb());
+    }
+  } else {
+    const plateFill = style === 'liquid' ? colPlate : hex(bg.map(v => v + (1 - v) * 0.035));
+    body.push('<g fill="' + plateFill + '">' + shape + '</g>');
+    const { rms, sw } = svgField(SVG_N);
+    const lw = P.linew * dpr;
+    const stroke = (d, col, w, op) => d && body.push('<path fill="none" stroke="' + col + '" stroke-width="' + r2(w) +
+      '" stroke-linecap="round" stroke-linejoin="round"' + (op < 1 ? ' stroke-opacity="' + op + '"' : '') + ' d="' + d + '"/>');
+    if (style === 'smooth' && smoothSub === 'contours') {
+      let rings = '';
+      for (let k = 1; k < P.levels; k++) rings += isoPath(rms, SVG_N, k / P.levels, pw, ph);
+      stroke(rings, colContour, lw * 0.7, 0.85);
+      stroke(isoPath(sw, SVG_N, 0, pw, ph), colNode, lw * 1.6, 1);
+    } else {
+      stroke(isoPath(sw, SVG_N, 0, pw, ph), hex(PAL_HI[palette] || PAL_HI[0]), lw, 1);
+    }
+  }
+
+  const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' + fw + '" height="' + fh + '" viewBox="0 0 ' + fw + ' ' + fh + '">\n' +
+    '<rect width="100%" height="100%" fill="' + colCanvas + '"/>\n' +
+    '<defs><clipPath id="plate">' + shape + '</clipPath></defs>\n' +
+    '<g transform="translate(' + r2(cx) + ' ' + r2(cy) + ') scale(1 -1) rotate(' + r2(deg) + ') translate(' + r2(-pw / 2) + ' ' + r2(-ph / 2) + ')">\n' +
+    '<g clip-path="url(#plate)">\n' + body.join('\n') + '\n</g>\n</g>\n</svg>\n';
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.download = 'chladni-' + Date.now() + '.svg';
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+document.getElementById('btn-svg').addEventListener('click', () => {
+  const b = document.getElementById('btn-svg');
+  b.disabled = true; b.textContent = 'tracing…';
+  // let the label paint before the trace blocks the thread
+  setTimeout(() => {
+    try { exportSvg(); } catch (err) { console.error('svg export failed:', err); }
+    b.disabled = false; b.textContent = 'export svg';
+  }, 30);
 });
 
 let recorder = null, recChunks = [], recStart = 0, recTimer = null;
@@ -5055,8 +5490,9 @@ requestAnimationFrame(frame);
   const TOGGLE_READ = {
     _medium: () => medium === 'powder', _grains: () => showGrains, _pause: () => paused, _snap: () => snapOn,
     _realhz: () => realHz, _notes: () => midiNotes, _driver: () => showDrive,
+    _fitrange: () => fitRange, _spectop: () => specTop,
   };
-  const TRIGGERS = new Set(['_scatter', '_fingers']);
+  const TRIGGERS = new Set(['_scatter', '_fingers', '_rothome']);
   const lfoKey = k => /^_lfo(\d)(rate|depth|phase|run)$/.exec(k);
   function readKey(k) {
     if (paramById[k]) return PB[k];
@@ -5087,6 +5523,7 @@ requestAnimationFrame(frame);
     _geom: '#geom', _edge: '[data-edge]', _disp: '[data-disp]', _material: '#material', _med3: '[data-med]', _medium: '[data-med]',
     _field: '[data-field]', _momentary: '[data-mom]', _grains: '#btn-grains', _pause: '#btn-pause', _snap: '#btn-snap', _realhz: '#btn-realhz',
     _notes: '#btn-midinotes', _driver: '#btn-driver', _scatter: '#btn-reseed', _fingers: '#btn-clearfingers',
+    _fitrange: '#btn-fitrange', _spectop: '#btn-spectop', _rothome: '#btn-rothome',
   };
   function controlFor(k) {
     if (paramById[k]) return document.getElementById('in-' + k);
@@ -5110,7 +5547,7 @@ requestAnimationFrame(frame);
     let el, sync;
     if (TRIGGERS.has(k)) {
       el = document.createElement('button');
-      el.type = 'button'; el.className = 'ctl-tg'; el.textContent = k === '_scatter' ? 'scatter' : 'clear';
+      el.type = 'button'; el.className = 'ctl-tg'; el.textContent = { _scatter: 'scatter', _fingers: 'clear', _rothome: 'reset' }[k];
       el.addEventListener('click', () => t.apply(true));
       sync = () => {};
     } else if (t.steps) {
@@ -5137,13 +5574,23 @@ requestAnimationFrame(frame);
       const d = paramById[k];
       el = document.createElement('input');
       el.type = 'range';
-      el.min = t.min; el.max = t.max; el.step = (d ? d.step : t.step) || (t.max - t.min) / 400;
+      // a parameter's slider can change axis (the frequency, stepping through modes)
+      const spec = () => d ? sliderSpec(k) : { min: t.min, max: t.max, step: t.step || (t.max - t.min) / 400 };
+      const s0 = spec();
+      el.min = s0.min; el.max = s0.max; el.step = s0.step;
       el.setAttribute('aria-label', t.label);
-      el.addEventListener('input', () => { writeKey(k, parseFloat(el.value)); if (valEl) valEl.textContent = fmtKey(k, readKey(k)); });
+      el.addEventListener('input', () => {
+        const v = parseFloat(el.value);
+        writeKey(k, d ? sliderVal(k, v) : v);
+        if (valEl) valEl.textContent = fmtKey(k, d ? P[k] : readKey(k));
+      });
       el.addEventListener('dblclick', () => { if (d) { setParam(k, d.value); sync(); } });
       sync = () => {
-        const v = readKey(k);
-        if (document.activeElement !== el) el.value = v;
+        const v = readKey(k), sp = spec();
+        if (document.activeElement !== el) {
+          el.min = sp.min; el.max = sp.max; el.step = sp.step;
+          el.value = d ? sliderPos(k, v) : v;
+        }
         if (valEl) valEl.textContent = fmtKey(k, d ? P[k] : v);
       };
     }
@@ -5238,7 +5685,7 @@ requestAnimationFrame(frame);
 
   /* ---- the status line as editors ---- */
   const ST_KEYS = {
-    f: ['freq', '_snap'], q: ['q'], drive: ['dx', 'dy', 'finger'], dominant: ['freq', 'q', 'partials'],
+    f: ['freq', '_snap', '_fitrange'], q: ['q'], drive: ['dx', 'dy', 'finger'], dominant: ['freq', 'q', 'partials'],
     grains: ['grains', 'feed', 'kill', '_momentary', 'crawl', 'jitter'],
   };
   const stPop = document.getElementById('st-pop');
