@@ -1039,6 +1039,13 @@
         <div class="toolrow">
           <button class="tool" id="btn-midinotes">notes → resonances</button>
         </div>
+        <div class="toolrow" id="notemode">
+          <button class="tool active" data-nmode="ladder">mode ladder</button>
+          <button class="tool" data-nmode="pitch">pitch → nearest mode</button>
+        </div>
+        <div class="btnrow" style="margin-bottom:10px">
+          <button class="act" id="btn-fit12">fit plate to 12-tet</button>
+        </div>
         <div id="midi-monitor">waiting for messages…</div>
         <div id="params-midi"></div>
         <div class="sublabel">cc mapping</div>
@@ -1056,11 +1063,23 @@
           the <b>cc</b> box takes a number by hand if you would rather read it off the
           controller's manual than coax it into sending the right knob — type it, or leave it
           empty to unbind.<br><br>
-            <b>notes → resonances</b> lets you play the plate from a keyboard. the <b>lowest note</b>
-          plays the plate's lowest mode, and each semitone above it moves one mode up the list, so a
-          chromatic scale steps through all the figures in order. the result is not in tune: the steps
-          are as far apart as the plate's modes are, not semitones. notes above the top of the list
-          stay on the highest mode, and changing the plate changes which mode each key plays.<br><br>
+          <b>notes → resonances</b> lets you play the plate from a keyboard, in one of two ways.<br><br>
+          <b>mode ladder</b>: the <b>lowest note</b> plays the plate's lowest mode, and each semitone
+          above it moves one mode up the list, so a chromatic scale steps through all the figures in
+          order. it is not in tune: the steps are as far apart as the plate's modes are, not
+          semitones. notes above the top of the list stay on the highest mode.<br><br>
+          <b>pitch → nearest mode</b>: the note is converted to hertz (a4 = 440) and then to plate
+          frequency, using <b>pitch per unit</b> under <b>Audio</b>, or the real-units calibration
+          while <b>real hz</b> is on. the audio always plays the note's exact pitch. the plate is
+          driven at the nearest mode if that mode lies within <b>capture</b> cents of the note, and
+          at the note's own frequency otherwise, where the figure is weaker and less defined. at 0 the
+          plate always follows the exact pitch; at the top of the range it always snaps.<br><br>
+          <b>fit plate to 12-tet</b> shifts the calibration (pitch per unit, or the thickness while
+          real hz is on) by up to half a semitone, to the setting where the plate's modes sit closest
+          to equal-tempered notes. the monitor shows the mean distance before and after. with the
+          modes closer to the keys, more notes fall inside the capture window. it only moves the
+          calibration, never the plate's shape, so the figures stay the same.<br><br>
+          changing the plate changes which mode each key plays, in both modes.<br><br>
           <b>lo / hi</b> set the range the full 0–127 sweep covers — invert them to reverse the knob.
           <b>smoothing</b> interpolates between 7-bit steps so sweeps do not stair-step.<br><br>
           a mapping only holds a parameter while a cc is actually moving it. once the sweep
@@ -1670,6 +1689,9 @@ const MIDI_PARAMS = [
   // semitone per rung from there
   { id: 'notebase', label: 'lowest note', min: 0, max: 108, step: 1, value: 24, dp: 0,
     fmt: v => noteName(Math.round(v)) },
+  // pitch mode: how close (in cents) a mode must be for a note to snap to it
+  { id: 'capture', label: 'capture', min: 0, max: 600, step: 1, value: 50, dp: 0,
+    fmt: v => v < 0.5 ? 'exact' : v >= 600 ? 'always' : '±' + Math.round(v) + '¢' },
 ];
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -3447,6 +3469,7 @@ function setParam(id, value, updateSlider = true) {
   const d = paramById[id];
   if (!d) return;
   if (id === 'freq' && snapOn) value = snapFreq(value);
+  if (id === 'freq' && !_notePlaying && noteHz !== null) noteHz = null;
   value = clampP(d, value);
   PB[id] = value;
   if (updateSlider) syncSlider(id);
@@ -4298,7 +4321,7 @@ function snapshotPatch() {
     params: Object.keys(PB).reduce((o, k) => (o[k] = PB[k], o), {}),
     lfos: lfos.map(l => ({ wave: l.wave, rate: l.rate, depth: l.depth, phase: l.phase, run: l.run,
                            assigns: l.assigns.map(a => ({ key: a.key, amt: a.amt })) })),
-    midi: { notes: midiNotes,
+    midi: { notes: midiNotes, noteMode,
             maps: midiMappings.map(m => ({ key: m.key, cc: m.cc, lo: m.lo, hi: m.hi })) },
   };
 }
@@ -4399,6 +4422,7 @@ function applyPatch(s) {
   const midiIn = Array.isArray(s.midi) ? { maps: s.midi } : (s.midi || null);
   if (midiIn && Array.isArray(midiIn.maps)) {
     if (typeof midiIn.notes === 'boolean') { midiNotes = midiIn.notes; updateMidiNotesUI(); }
+    if (NOTE_MODES.includes(midiIn.noteMode)) { noteMode = midiIn.noteMode; updateMidiNotesUI(); }
     midiMappings = midiIn.maps.filter(m => m && MAP_TARGETS[m.key]).map(m => {
       const t = MAP_TARGETS[m.key];
       return { id: _mapSeq++, key: m.key,
@@ -4507,6 +4531,10 @@ MAP_TARGETS['_med3'] = { label: 'medium (sand / powder / both)', steps: ['sand',
   apply: i => { const m = ['sand', 'powder', 'both'][i]; if (m !== medium) setMedium(m); } };
 MAP_TARGETS['_field'] = { label: 'field (off / motion / rms)', steps: ['0', '1', '2'],
   apply: i => { if (i !== fieldMode) setField(i); } };
+MAP_TARGETS['_notemode'] = { label: 'note mode (ladder / pitch)', steps: ['ladder', 'pitch'],
+  apply: i => { if (NOTE_MODES[i] !== noteMode) setNoteMode(NOTE_MODES[i]); } };
+MAP_TARGETS['_fit12'] = { label: 'fit plate to 12-tet (trigger)', toggle: true,
+  apply: on => { if (on) fitTo12Tet(); } };
 MAP_TARGETS['_momentary'] = { label: 'momentary (off / fade / noise)', steps: ['0', '1', '2'],
   apply: i => { if (i !== momentary) setMomentary(i); } };
 
@@ -4555,6 +4583,7 @@ function saveMidi() {
     localStorage.setItem('chladni.midi', JSON.stringify({
       input: midiInputId,
       notes: midiNotes,
+      noteMode,
       maps: midiMappings.map(m => ({ key: m.key, cc: m.cc, lo: m.lo, hi: m.hi })),
     }));
   } catch (e) {}
@@ -4564,6 +4593,7 @@ function loadMidi() {
     const s = JSON.parse(localStorage.getItem('chladni.midi') || '{}');
     midiInputId = s.input || '';
     midiNotes = !!s.notes;
+    if (NOTE_MODES.includes(s.noteMode)) noteMode = s.noteMode;
     midiMappings = (s.maps || [])
       .filter(m => MAP_TARGETS[m.key])
       .map(m => ({ id: _mapSeq++, key: m.key, cc: m.cc ?? null, lo: m.lo, hi: m.hi,
@@ -4601,6 +4631,11 @@ function onMidiMessage(e, inputId) {
   if (type === 0x90 || type === 0x80) {
     if (type === 0x90 && d2 > 0) notesHeld.add(d1); else notesHeld.delete(d1);
     setHeld();
+  }
+  if (midiNotes && noteMode === 'pitch' && (type === 0x90 || type === 0x80)) {
+    if (type === 0x80 || d2 === 0) return;                      // note off holds the figure
+    playPitch(d1);
+    return;
   }
   // note on walks the plate's own ladder of resonances, a rung per semitone
   if (midiNotes && (type === 0x90 || type === 0x80)) {
@@ -4807,6 +4842,7 @@ const MIDI_BTN_AT = {
   _grains: '#btn-grains', _driver: '#btn-driver', _pause: '#btn-pause', _snap: '#btn-snap',
   _fitrange: '#btn-fitrange', _spectop: '#btn-spectop', _rothome: '#btn-rothome',
   _realhz: '#btn-realhz', _notes: '#btn-midinotes', _scatter: '#btn-reseed', _fingers: '#btn-clearfingers',
+  _notemode: '#notemode', _fit12: '#btn-fit12',
 };
 function learnMapFor(key) { return midiMappings.find(m => m.id === mapLearnId && m.key === key); }
 // an armed mapping made by one of these buttons that never got a cc is dropped
@@ -4891,13 +4927,108 @@ document.getElementById('midi-input-select').addEventListener('change', e => {
   midiInputId = e.target.value; saveMidi();
 });
 
+/* ---- pitch → nearest mode ----
+   the note's exact frequency goes to the audio; the plate is driven at the
+   nearest mode when that mode is within the capture window, and at the note's
+   own frequency when it is not. cents are the right distance here: a fixed
+   window in hertz would be huge at the bottom of the keyboard and nothing at
+   the top. */
+const NOTE_MODES = ['ladder', 'pitch'];
+let noteMode = 'ladder';
+let noteHz = null;                  // the pitch a note asked for, while it still owns the drive
+let _notePlaying = false;
+function midiHz(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+function unitHz() { return realHz ? hzPerUnit() : P.basehz; }
+function cents(a, b) { return 1200 * Math.log2(a / b); }
+function playPitch(n) {
+  const hz = midiHz(n), F = hz / unitHz();
+  const lad = noteLadder();
+  let target = F, mode = null;
+  if (lad.length && P.capture >= 0.5) {
+    // nearest by ratio, not by difference
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < lad.length; i++) {
+      const d = Math.abs(cents(lad[i], F));
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (P.capture >= 600 || bd <= P.capture) { target = lad[best]; mode = { i: best, c: cents(lad[best], F) }; }
+  }
+  _notePlaying = true;
+  setParam('freq', target);
+  _notePlaying = false;
+  noteHz = hz;
+  updateAudio();
+  const out = target !== PB.freq || F < paramById.freq.min || F > paramById.freq.max;
+  document.getElementById('midi-monitor').innerHTML =
+    'note <b>' + noteName(n) + '</b> ' + hz.toFixed(1) + ' hz → ' +
+    (mode ? 'mode <b>' + (mode.i + 1) + '</b>/' + lad.length + ' · f <b>' + PB.freq.toFixed(2) + '</b> (' +
+            (mode.c >= 0 ? '+' : '') + mode.c.toFixed(0) + '¢)'
+          : 'f <b>' + PB.freq.toFixed(2) + '</b> exact') +
+    (out ? ' <i>(outside the frequency range)</i>' : '');
+}
+
+/* shift the calibration by at most half a semitone so the plate's modes sit as
+   close as possible to equal-tempered notes. moving the calibration by a whole
+   semitone moves every mode by one, so the error repeats each semitone and
+   only that window needs searching. the weight favours the lower modes, which
+   are further apart and carry the clearest figures. */
+function noteError(lad, k) {
+  let sum = 0, wsum = 0;
+  lad.forEach((F, i) => {
+    const hz = F * k;
+    if (hz < 20 || hz > 12000) return;
+    const m = 12 * Math.log2(hz / 440);
+    const e = (m - Math.round(m)) * 100;
+    const w = 1 / (1 + i * 0.05);
+    sum += w * e * e; wsum += w;
+  });
+  return wsum ? Math.sqrt(sum / wsum) : NaN;
+}
+function fitTo12Tet() {
+  const lad = noteLadder();
+  const mon = document.getElementById('midi-monitor');
+  const k0 = unitHz();
+  const before = noteError(lad, k0);
+  if (!Number.isFinite(before)) { mon.textContent = 'no modes in the audible range to fit'; return; }
+  let bestS = 0, bestE = before;
+  for (let sc = -50; sc <= 50; sc += 0.25) {
+    const e = noteError(lad, k0 * Math.pow(2, sc / 1200));
+    if (e < bestE - 1e-6 || (Math.abs(e - bestE) < 1e-6 && Math.abs(sc) < Math.abs(bestS))) { bestE = e; bestS = sc; }
+  }
+  const ratio = Math.pow(2, bestS / 1200);
+  // hz per unit is linear in thickness, so either knob scales it exactly
+  if (realHz) setParam('pthick', P.pthick * ratio); else setParam('basehz', P.basehz * ratio);
+  const after = noteError(lad, unitHz());
+  mon.innerHTML = 'fitted: ' + (bestS >= 0 ? '+' : '') + bestS.toFixed(1) + '¢ · rms off-note <b>' +
+    before.toFixed(0) + '¢</b> → <b>' + after.toFixed(0) + '¢</b>' +
+    (Math.abs(unitHz() / k0 - ratio) > 1e-3 ? ' <i>(limited by the ' + (realHz ? 'thickness' : 'pitch per unit') + ' range)</i>' : '');
+}
+document.getElementById('btn-fit12').addEventListener('click', fitTo12Tet);
+
+function setNoteMode(m) {
+  if (!NOTE_MODES.includes(m)) return;
+  noteMode = m;
+  if (m !== 'pitch' && noteHz !== null) { noteHz = null; updateAudio(); }
+  updateMidiNotesUI(); saveMidi();
+}
+document.querySelectorAll('[data-nmode]').forEach(b => b.addEventListener('click', () => setNoteMode(b.dataset.nmode)));
+
 const btnMidiNotes = document.getElementById('btn-midinotes');
 function updateMidiNotesUI() {
   btnMidiNotes.classList.toggle('active', midiNotes);
-  const wrap = document.getElementById('param-notebase');
-  if (wrap) wrap.classList.toggle('disabled', !midiNotes);
-  const inp = document.getElementById('in-notebase');
-  if (inp) inp.disabled = !midiNotes;
+  document.querySelectorAll('[data-nmode]').forEach(b => {
+    b.classList.toggle('active', b.dataset.nmode === noteMode);
+    b.disabled = !midiNotes;
+  });
+  const fit = document.getElementById('btn-fit12');
+  if (fit) fit.disabled = !midiNotes || noteMode !== 'pitch';
+  const use = { notebase: midiNotes && noteMode === 'ladder', capture: midiNotes && noteMode === 'pitch' };
+  for (const id in use) {
+    const wrap = document.getElementById('param-' + id);
+    if (wrap) wrap.classList.toggle('disabled', !use[id]);
+    const inp = document.getElementById('in-' + id);
+    if (inp) inp.disabled = !use[id];
+  }
 }
 btnMidiNotes.addEventListener('click', () => {
   midiNotes = !midiNotes;
@@ -4940,7 +5071,8 @@ if (!window.isSecureContext) {
 let actx = null, osc = null, gainNode = null, audioOn = false;
 
 function audioHz() {
-  const hz = realHz ? P.freq * hzPerUnit() : P.basehz * P.freq;
+  // a pitch-mode note sounds at its own pitch, whatever mode the plate snapped to
+  const hz = noteHz !== null ? noteHz : (realHz ? P.freq * hzPerUnit() : P.basehz * P.freq);
   return Math.min(12000, Math.max(20, hz));
 }
 
@@ -5479,11 +5611,11 @@ requestAnimationFrame(frame);
   const STEP_READ = {
     _geom: () => GEOM_STEPS.indexOf(geom), _edge: () => EDGE_STEPS.indexOf(edge), _disp: () => DISP_STEPS.indexOf(disp),
     _material: () => MAT_KEYS.indexOf(material), _med3: () => ['sand', 'powder', 'both'].indexOf(medium), _field: () => fieldMode,
-    _momentary: () => momentary,
+    _momentary: () => momentary, _notemode: () => NOTE_MODES.indexOf(noteMode),
   };
   const STEP_LABEL = {
     _geom: i => GEOM_LABEL[GEOM_STEPS[i]] || GEOM_STEPS[i], _field: i => FIELD_NAMES[i],
-    _momentary: i => ['off', 'fade', 'noise'][i],
+    _momentary: i => ['off', 'fade', 'noise'][i], _notemode: i => NOTE_MODES[i],
     _material: i => (MATERIALS[MAT_KEYS[i]] && MATERIALS[MAT_KEYS[i]].label) || MAT_KEYS[i],
     _edge: i => ({ supported: 'supp.', clamped: 'clamp', mixed: 'mixed', free: 'free' }[EDGE_STEPS[i]] || EDGE_STEPS[i]),
   };
@@ -5492,7 +5624,7 @@ requestAnimationFrame(frame);
     _realhz: () => realHz, _notes: () => midiNotes, _driver: () => showDrive,
     _fitrange: () => fitRange, _spectop: () => specTop,
   };
-  const TRIGGERS = new Set(['_scatter', '_fingers', '_rothome']);
+  const TRIGGERS = new Set(['_scatter', '_fingers', '_rothome', '_fit12']);
   const lfoKey = k => /^_lfo(\d)(rate|depth|phase|run)$/.exec(k);
   function readKey(k) {
     if (paramById[k]) return PB[k];
@@ -5524,6 +5656,7 @@ requestAnimationFrame(frame);
     _field: '[data-field]', _momentary: '[data-mom]', _grains: '#btn-grains', _pause: '#btn-pause', _snap: '#btn-snap', _realhz: '#btn-realhz',
     _notes: '#btn-midinotes', _driver: '#btn-driver', _scatter: '#btn-reseed', _fingers: '#btn-clearfingers',
     _fitrange: '#btn-fitrange', _spectop: '#btn-spectop', _rothome: '#btn-rothome',
+    _notemode: '[data-nmode]', _fit12: '#btn-fit12',
   };
   function controlFor(k) {
     if (paramById[k]) return document.getElementById('in-' + k);
@@ -5547,7 +5680,7 @@ requestAnimationFrame(frame);
     let el, sync;
     if (TRIGGERS.has(k)) {
       el = document.createElement('button');
-      el.type = 'button'; el.className = 'ctl-tg'; el.textContent = { _scatter: 'scatter', _fingers: 'clear', _rothome: 'reset' }[k];
+      el.type = 'button'; el.className = 'ctl-tg'; el.textContent = { _scatter: 'scatter', _fingers: 'clear', _rothome: 'reset', _fit12: 'fit' }[k];
       el.addEventListener('click', () => t.apply(true));
       sync = () => {};
     } else if (t.steps) {
