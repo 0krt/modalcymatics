@@ -824,7 +824,9 @@
         lfo on frequency all step through the same list.<br><br>
         <b>resonant range</b> limits the frequency slider to the span from the lowest to the highest
         resonance in the catalogue, so none of its travel is spent where there are no modes.<br><br>
-        the strip shows the drive's partials (gold) against the plate's mode frequencies (ticks).
+        the strip shows the drive's partials (gold) against the plate's mode frequencies (blue: a
+        guide line and a tick per mode). the modes the drive is exciting light up as cyan dots, larger
+        the more they ring.
         <b>spectrum above plate</b> moves it to a bar over the plate, where it is wider and stays
         visible while you work in other tabs.
       </div>
@@ -883,17 +885,19 @@
         <button class="tool" data-sub="contours">contours</button>
       </div>
       <div class="toolrow" id="liquidmat">
-        <button class="tool active" data-lmat="chrome">chrome</button>
-        <button class="tool" data-lmat="gloss">gloss</button>
+        <button class="tool active" data-lmat="gloss">gloss</button>
         <button class="tool" data-lmat="water">water</button>
       </div>
       <div class="colorrow" id="contourcols">
         <label for="col-contour">contours<input type="color" id="col-contour" value="#3d6b9e"></label>
-        <label for="col-node">nodal lines<input type="color" id="col-node" value="#ffd173"></label>
+        <label for="col-node" id="lbl-node">nodal lines<input type="color" id="col-node" value="#ffd173"></label>
+      </div>
+      <div class="toolrow" id="noderow">
+        <button class="tool active" id="btn-nodes">nodal lines: shown</button>
       </div>
       <div class="colorrow" id="platecols">
         <label for="col-plate">plate<input type="color" id="col-plate" value="#131418"></label>
-        <label for="col-grid">grid<input type="color" id="col-grid" value="#25282e"></label>
+        <label for="col-grid" id="lbl-grid">grid<input type="color" id="col-grid" value="#25282e"></label>
       </div>
       <div id="params-style"></div>
       <div class="hint" id="i-style">
@@ -903,11 +907,16 @@
         <b>smooth</b> has three views of it. <b>nodal lines</b> draws the lines that don't move.
         <b>density</b> shades where settled sand would be; <b>softness</b> sets how far it spreads
         from the lines. <b>contours</b> draws the amplitude as contour lines, like a topographic map,
-        with the nodal lines in bold. the two colour fields set the contour and nodal-line colours.<br><br>
+        with the nodal lines in bold. the two colour fields set the contour and nodal-line colours, and
+        <b>nodal lines: hidden</b> leaves only the contours. <b>plate</b> sets the colour of the sheet
+        under them and <b>plate opacity</b> how much of it covers the canvas colour: at 1 the canvas
+        no longer shows through. <b>contour opacity</b> does the same for the contour lines over the
+        plate.<br><br>
         <b>liquid</b> fills the nodal channels with a reflective liquid. <b>fill</b> sets the amount,
         <b>depth</b> the height of the beads, <b>light angle</b> the direction of the main light.
-        <b>chrome</b> is a mirror, <b>gloss</b> a resin tinted with the sand colour, and <b>water</b> is
-        clear and refracts the plate beneath. <b>plate</b> and <b>grid</b> set the colours of that
+        <b>gloss</b> is a resin tinted with the sand colour, and <b>water</b> is clear and refracts
+        the plate beneath. <b>liquid motion</b> sets the liquid moving: the shores breathe with the
+        plate's slowed oscillation and ripples run along the channels. at zero it lies still. <b>plate</b> and <b>grid</b> set the colours of that
         surface, and <b>plate grid</b> the number of grid cells across it (0 turns the grid off).<br><br>
         <b>morph time</b> makes changes settle the way a real plate does: each mode's amplitude moves
         to its new value with that mode's own time constant, Q / (π f). low, sharp modes change
@@ -1124,7 +1133,8 @@
         drawn. density and liquid are shading, which has no vector equivalent, so they export their
         nodal lines. the grains style's field shading is not included.<br><br>
         <b>capture resolution</b> renders the video off-screen at that size, independent of the
-        window. webm/vp9 at a high bitrate is much cleaner than the default. frames full of grains
+        window. video records as mp4 (h.264); a browser that cannot record mp4 falls back to webm.
+        a high bitrate is much cleaner than the default. frames full of grains
         are hard to compress, so raise the bitrate if the result looks smeared.
       </div>
     </div>
@@ -1673,6 +1683,9 @@ const STYLE_PARAMS = [
   { id: 'linew',  label: 'line width',  min: 0.3, max: 8,    step: 0.05, value: 2,    dp: 2, unit: ' px' },
   { id: 'soft',   label: 'softness',    min: 0.01, max: 0.5, step: 0.002, value: 0.08, dp: 3 },
   { id: 'levels', label: 'contour levels', min: 2, max: 24,  step: 1,    value: 8,    dp: 0 },
+  { id: 'copac',  label: 'contour opacity', min: 0, max: 1,  step: 0.01, value: 0.85, dp: 2 },
+  { id: 'popac',  label: 'plate opacity', min: 0,   max: 1,    step: 0.01, value: 1,    dp: 2 },
+  { id: 'lmotion', label: 'liquid motion', min: 0,  max: 1,    step: 0.01, value: 0.5,  dp: 2 },
   { id: 'lfill',  label: 'fill',        min: 0,   max: 1,    step: 0.005, value: 0.5, dp: 3 },
   { id: 'depth',  label: 'depth',       min: 0.1, max: 4,    step: 0.02, value: 1,    dp: 2 },
   { id: 'light',  label: 'light angle', min: 0,   max: 360,  step: 1,    value: 125,  dp: 0, unit: '°' },
@@ -1887,13 +1900,29 @@ function sizeFactor() {
 function rescaleModes() {
   const k = sizeFactor();
   for (const m of catalogue) m.F = m.F0 * k;
-  // the ladder of distinct resonances, for stepping through modes and the wheel
-  modeFreqs = [...new Set(catalogue.map(m => +m.F.toFixed(4)))].sort((a, b) => a - b);
+  // the ladder of distinct resonances, for stepping through modes, the wheel and
+  // the midi ladder. degenerate modes (a square's (m,n) and (n,m), a disc's
+  // rotated twins) come out of the solver a few parts per million apart, and
+  // rounding them to a fixed number of places split a pair whenever it
+  // straddled a rounding boundary — two rungs, two keys, one figure. pairs that
+  // are genuinely split but by far less than a resonance is wide are the same
+  // story: driven at either, both ring, and the plate shows one figure. so
+  // rungs closer than LADDER_TOL apart (relative) are one rung, at their mean.
+  // that is under a quarter of the narrowest linewidth the q slider allows.
+  const fs = catalogue.map(m => m.F).sort((a, b) => a - b);
+  modeFreqs = [];
+  for (let i = 0; i < fs.length;) {
+    let j = i + 1, sum = fs[i];
+    while (j < fs.length && fs[j] - fs[j - 1] <= LADDER_TOL * fs[j]) sum += fs[j++];
+    modeFreqs.push(sum / (j - i));
+    i = j;
+  }
   // a new ladder can leave the drive between rungs, or outside a fitted range
   if (paramById.freq && document.getElementById('in-freq')) setParam('freq', PB.freq);
 }
 
 let modeFreqs = [];
+const LADDER_TOL = 1e-3;
 let fitRange = false;
 
 /* the ladder the keyboard walks: only the resonances the frequency control can
@@ -2632,10 +2661,10 @@ const GEOM_ID = { rect: 0, disc: 1, ring: 1, tri: 2 };
    the whole mode set, and that cross-fades between two snapshots.
    ================================================================ */
 
-let style = 'grains', smoothSub = 'lines', liqMat = 'chrome';
+let style = 'grains', smoothSub = 'lines', liqMat = 'gloss', showNodes = true;
 const STYLE_KEYS = ['grains', 'smooth', 'liquid'];
 const SUB_KEYS = ['lines', 'density', 'contours'];
-const LMAT_KEYS = ['chrome', 'gloss', 'water'];
+const LMAT_KEYS = ['gloss', 'water'];
 
 // shared glsl: profile lookup, palettes and the per-geometry mode shape
 const GLSL_COMMON = `
@@ -2740,13 +2769,17 @@ uniform vec2  uOrigin, uPlate;
 uniform float uSide;
 uniform float uRot;
 uniform int   uStyle;       // 0 lines, 1 density, 2 contours, 3 liquid
-uniform int   uMat;         // 0 chrome, 1 gloss, 2 water
+uniform int   uMat;         // 0 gloss, 1 water
 uniform int   uPal;
 uniform vec3  uBg, uTint;
 uniform vec3  uContour, uNode;   // contour rings and the nodal lines among them
 uniform vec3  uPlateCol, uGridCol;
 uniform float uGrid;             // grid cells across the plate's short side, 0 for none
 uniform float uLineW, uSoft, uLevels, uFill, uDepth;
+uniform float uPlateOp, uContourOp;   // contours: the sheet over the canvas, the rings over the sheet
+uniform int   uNodes;                 // contours: draw the nodal lines among them
+uniform float uTime, uMotion;         // liquid: elapsed seconds, and how much it moves
+uniform float uPhase;                 // liquid: the drive's phase at the slowed motion rate
 uniform vec2  uLight;       // key light direction on screen
 uniform vec2  uDrive;
 uniform int   uShowDrive;
@@ -2803,7 +2836,32 @@ float fldL(vec2 q) {
    its square, so the crest is round, and the shore meets the plate at a finite
    angle instead of a vertical wall. negative outside the liquid. */
 float shore() { return uSoft * -log(thresh()); }
-float heightRaw(vec2 q) { float u = fldL(q) / shore(); return 1.0 - u * u; }
+/* liquid motion, three ways, all scaled by uMotion and all gone at zero.
+   the field is read through a slow rotational flow, so the shores crawl.
+   the shore level swells and shrinks with the drive at the slowed motion
+   rate, so the channels breathe in time with the plate. and a few travelling
+   ripples run through the beads; they are weighted by the bead's own height,
+   so they vanish at the shore and the liquid never spills past it. */
+vec2 flowQ(vec2 q) {
+  if (uMotion <= 0.0) return q;
+  float tt = uTime * 0.35;
+  vec2 w = vec2(sin(q.y * 9.0 + tt * 1.3) + 0.5 * sin(q.x * 15.0 - tt * 0.9),
+                cos(q.x * 8.0 - tt * 1.1) + 0.5 * cos(q.y * 13.0 + tt * 0.7));
+  return q + w * uMotion * 0.004;
+}
+float heightRaw(vec2 q) {
+  float sh = shore() * (1.0 + 0.18 * uMotion * sin(uPhase));
+  float u = fldL(flowQ(q)) / sh;
+  float h = 1.0 - u * u;
+  if (uMotion > 0.0 && h > 0.0) {
+    vec2 p = q * uPlate / uSide * 120.0;
+    float r = sin(p.x * 0.8 + p.y * 0.6 - uTime * 2.3)
+            + sin(-p.x * 0.5 + p.y * 0.9 - uTime * 1.7)
+            + 0.6 * sin(p.x * 1.3 - p.y * 0.4 + uTime * 2.9);
+    h += uMotion * 0.06 * h * r;
+  }
+  return h;
+}
 
 // a studio around the plate: dim surround, one soft key, a strip light opposite
 vec3 env(vec3 R) {
@@ -2867,13 +2925,17 @@ void main() {
   } else if (uStyle == 1) {
     col = palette(uPal, exp(-v / uSoft));
   } else if (uStyle == 2) {
-    col = mix(uBg, vec3(1.0), 0.035);                     // the same bare plate as nodal lines
+    // the sheet: its own colour laid over the canvas at the plate opacity. at 0
+    // it is the bare plate the nodal-lines view has; at 1 the canvas is covered
+    col = mix(mix(uBg, vec3(1.0), 0.035), uPlateCol, uPlateOp);
     float x = v * uLevels;
     float g = abs(fract(x - 0.5) - 0.5) / max(fwv, 1e-6);
     float cl = 1.0 - smoothstep(uLineW * 0.35 - 0.5, uLineW * 0.35 + 0.5, g);
-    col = mix(col, uContour, cl * 0.85 * step(0.5, x));
-    float node = 1.0 - smoothstep(uLineW * 0.8 - 0.6, uLineW * 0.8 + 0.6, dn);
-    col = mix(col, uNode, node);
+    col = mix(col, uContour, cl * uContourOp * step(0.5, x));
+    if (uNodes == 1) {
+      float node = 1.0 - smoothstep(uLineW * 0.8 - 0.6, uLineW * 0.8 + 0.6, dn);
+      col = mix(col, uNode, node);
+    }
   } else {
     // ---- liquid ----
     vec2 dx = vec2(uTexel.x, 0.0), dy = vec2(0.0, uTexel.y);
@@ -2908,8 +2970,6 @@ void main() {
 
     vec3 liq;
     if (uMat == 0) {
-      liq = env(R) * vec3(0.92, 0.94, 0.98) * (0.75 + 0.25 * fres);
-    } else if (uMat == 1) {
       float diff = max(dot(N, L), 0.0);
       liq = uTint * (0.14 + 0.78 * diff) + env(R) * fres * 0.9 + vec3(spec * 1.3);
     } else {
@@ -2951,7 +3011,7 @@ const uR = uniformsOf(progRms, ['uMode', 'uCount', 'uNH', 'uAmp', 'uNorm', 'uSiz
 const uM = uniformsOf(progMix, ['uOld', 'uNew', 'uT', 'uSize']);
 const uS = uniformsOf(progStyle, ['uOld', 'uNew', 'uBlend', 'uEnc', 'uTexel', 'uOrigin', 'uPlate', 'uSide', 'uRot',
   'uStyle', 'uMat', 'uPal', 'uBg', 'uTint', 'uLineW', 'uSoft', 'uLevels', 'uFill', 'uDepth', 'uLight',
-  'uContour', 'uNode', 'uPlateCol', 'uGridCol', 'uGrid',
+  'uContour', 'uNode', 'uPlateCol', 'uGridCol', 'uGrid', 'uPlateOp', 'uContourOp', 'uNodes', 'uTime', 'uMotion', 'uPhase',
   'uDrive', 'uShowDrive', 'uFinger', 'uFingerN', 'uProf', 'uGeom', 'uInner']);
 
 // a float render target when the browser has one; otherwise 8 bits, sqrt-encoded
@@ -3192,6 +3252,12 @@ function drawStyled(dt, bg) {
   gl.uniform3fv(uS.uPlateCol, hex2rgb(colPlate));
   gl.uniform3fv(uS.uGridCol, hex2rgb(colGrid));
   gl.uniform1f(uS.uGrid, P.pgrid);
+  gl.uniform1f(uS.uPlateOp, P.popac);
+  gl.uniform1f(uS.uContourOp, P.copac);
+  gl.uniform1i(uS.uNodes, showNodes ? 1 : 0);
+  gl.uniform1f(uS.uTime, t);
+  gl.uniform1f(uS.uPhase, (2 * Math.PI * P.freq * t * P.motion) % (2 * Math.PI));
+  gl.uniform1f(uS.uMotion, P.lmotion);
   gl.uniform1f(uS.uLineW, P.linew * dprEff);
   gl.uniform1f(uS.uSoft, P.soft);
   gl.uniform1f(uS.uLevels, P.levels);
@@ -3221,10 +3287,14 @@ function updateStyleUI() {
   disp_(byId('smoothsub'), style === 'smooth');
   disp_(byId('liquidmat'), style === 'liquid');
   const sm = style === 'smooth', lq = style === 'liquid';
-  disp_(byId('contourcols'), sm && smoothSub === 'contours');
-  disp_(byId('platecols'), lq);
+  const ct = sm && smoothSub === 'contours';
+  disp_(byId('contourcols'), ct);
+  disp_(byId('noderow'), ct);
+  disp_(byId('lbl-node'), showNodes);
+  disp_(byId('platecols'), lq || ct);
+  disp_(byId('lbl-grid'), lq);
   const show = { morph: !grains, linew: sm && smoothSub !== 'density', soft: (sm && smoothSub === 'density') || lq,
-                 levels: sm && smoothSub === 'contours', lfill: lq, depth: lq, light: lq, pgrid: lq };
+                 levels: ct, copac: ct, popac: ct, lfill: lq, depth: lq, light: lq, pgrid: lq, lmotion: lq };
   Object.keys(show).forEach(k => disp_(byId('param-' + k), show[k]));
   document.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === style));
   document.querySelectorAll('[data-sub]').forEach(b => b.classList.toggle('active', b.dataset.sub === smoothSub));
@@ -3243,6 +3313,14 @@ function setLiqMat(m) { if (LMAT_KEYS.includes(m)) { liqMat = m; updateStyleUI()
 document.querySelectorAll('[data-style]').forEach(b => b.addEventListener('click', () => setStyle(b.dataset.style)));
 document.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => setSmoothSub(b.dataset.sub)));
 document.querySelectorAll('[data-lmat]').forEach(b => b.addEventListener('click', () => setLiqMat(b.dataset.lmat)));
+function setShowNodes(v) {
+  showNodes = !!v;
+  const b = document.getElementById('btn-nodes');
+  b.textContent = 'nodal lines: ' + (showNodes ? 'shown' : 'hidden');
+  b.classList.toggle('active', showNodes);
+  updateStyleUI();
+}
+document.getElementById('btn-nodes').addEventListener('click', () => setShowNodes(!showNodes));
 
 let t = 0, last = performance.now();
 
@@ -3922,34 +4000,56 @@ function drawSpectrum() {
   // the axis spans the slider's reach, so a fitted range fills the strip
   const fmax = Math.max(freqBounds()[1], P.freq * (spec.length ? spec[spec.length - 1].n : 1) * 1.1);
 
-  // mode frequencies as faint ticks — you can see partials hunting for resonances
-  sctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  /* the plate's modes, one per rung of the ladder, so a degenerate pair is one
+     mark. each gets a faint guide the full height of the strip — a partial
+     reads against it at a glance — and a solid tick under the baseline. the
+     modes the drive is exciting right now light up in cyan, taller the more
+     they ring, so you can see which resonances a partial is catching. */
+  const base = h - 13;
+  sctx.lineWidth = 1;
+  sctx.strokeStyle = 'rgba(140,200,255,0.16)';
   sctx.beginPath();
-  const seen = new Set();
-  for (const m of catalogue) {
-    const key = m.F.toFixed(3);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (m.F > fmax) continue;
-    const x = m.F / fmax * w;
-    sctx.moveTo(x, h - 10); sctx.lineTo(x, h - 4);
+  for (const f of modeFreqs) {
+    if (f > fmax) continue;
+    const x = Math.round(f / fmax * w) + 0.5;
+    sctx.moveTo(x, 14); sctx.lineTo(x, base);
   }
   sctx.stroke();
+  sctx.lineWidth = 1.5;
+  sctx.strokeStyle = 'rgba(180,215,255,0.75)';
+  sctx.beginPath();
+  for (const f of modeFreqs) {
+    if (f > fmax) continue;
+    const x = Math.round(f / fmax * w) + 0.5;
+    sctx.moveTo(x, base + 1); sctx.lineTo(x, h - 2);
+  }
+  sctx.stroke();
+  const tmax = Math.max(...active.map(m => m.tot), 1e-9);
+  for (const m of active) {
+    if (m.F > fmax) continue;
+    const e = m.tot / tmax;
+    if (e < 0.03) continue;                     // only the modes that visibly ring
+    const r = Math.sqrt(e);
+    const x = m.F / fmax * w;
+    sctx.fillStyle = 'rgba(110,220,255,' + (0.35 + 0.65 * r).toFixed(3) + ')';
+    sctx.beginPath(); sctx.arc(x, base + 6, 1.8 + 2.2 * r, 0, Math.PI * 2); sctx.fill();
+  }
 
+  sctx.lineWidth = 1;
   sctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  sctx.beginPath(); sctx.moveTo(0, h - 10.5); sctx.lineTo(w, h - 10.5); sctx.stroke();
+  sctx.beginPath(); sctx.moveTo(0, base + 0.5); sctx.lineTo(w, base + 0.5); sctx.stroke();
 
   const amax = Math.max(...spec.map(p => p.a), 1e-6);
   for (const p of spec) {
     if (p.f > fmax) continue;
-    const x = p.f / fmax * w, hh = (p.a / amax) * (h - 16);
+    const x = p.f / fmax * w, hh = (p.a / amax) * (base - 16);
     sctx.strokeStyle = '#e8c26a';
     sctx.lineWidth = 2;
-    sctx.beginPath(); sctx.moveTo(x, h - 11); sctx.lineTo(x, h - 11 - hh); sctx.stroke();
+    sctx.beginPath(); sctx.moveTo(x, base); sctx.lineTo(x, base - hh); sctx.stroke();
   }
   sctx.fillStyle = '#9aa2b4';
   sctx.font = '10px ui-monospace, monospace';
-  sctx.fillText('partials vs. modal frequencies →', 2, 11);
+  sctx.fillText('partials (gold) vs. modes (blue, lit when ringing) →', 2, 11);
 }
 
 function drawStatus() {
@@ -4309,7 +4409,7 @@ function snapshotPatch() {
     drive:  { waveform, snap: snapOn, fitRange },
     grains: { medium, evenFeed, momentary },
     render: { field: fieldMode, palette, grains: showGrains, driver: showDrive, canvas: colCanvas,
-              style, smooth: smoothSub, liquid: liqMat,
+              style, smooth: smoothSub, liquid: liqMat, nodes: showNodes,
               contourCol: colContour, nodeCol: colNode, plateCol: colPlate, gridCol: colGrid,
               specTop },
     audio:  { realHz },
@@ -4390,7 +4490,9 @@ function applyPatch(s) {
   if (rn.field === 0 || rn.field === 1 || rn.field === 2) setField(rn.field);
   // patches from before the smooth styles load as grains
   setSmoothSub(SUB_KEYS.includes(rn.smooth) ? rn.smooth : 'lines');
-  setLiqMat(LMAT_KEYS.includes(rn.liquid) ? rn.liquid : 'chrome');
+  // chrome is gone; a patch that used it comes back as gloss
+  setLiqMat(LMAT_KEYS.includes(rn.liquid) ? rn.liquid : 'gloss');
+  setShowNodes(rn.nodes !== false);
   setStyle(STYLE_KEYS.includes(rn.style) ? rn.style : 'grains');
   if (MED_KEYS.includes(gr.medium)) setMedium(gr.medium);
   if (typeof gr.evenFeed === 'boolean') setEvenFeed(gr.evenFeed);
@@ -5289,7 +5391,11 @@ function exportSvg() {
       dot(nCoarse, shownFine(), r2(0.42 * Math.max(1, P.gsize * 0.65) * dpr), fineRgb());
     }
   } else {
-    const plateFill = style === 'liquid' ? colPlate : hex(bg.map(v => v + (1 - v) * 0.035));
+    const ct = style === 'smooth' && smoothSub === 'contours';
+    const bare = bg.map(v => v + (1 - v) * 0.035);
+    // contours: the plate colour over the canvas at the plate opacity, as drawn
+    const plateFill = style === 'liquid' ? colPlate
+      : ct ? hex(bare.map((v, i) => v + (hex2rgb(colPlate)[i] - v) * P.popac)) : hex(bare);
     body.push('<g fill="' + plateFill + '">' + shape + '</g>');
     const { rms, sw } = svgField(SVG_N);
     const lw = P.linew * dpr;
@@ -5298,8 +5404,8 @@ function exportSvg() {
     if (style === 'smooth' && smoothSub === 'contours') {
       let rings = '';
       for (let k = 1; k < P.levels; k++) rings += isoPath(rms, SVG_N, k / P.levels, pw, ph);
-      stroke(rings, colContour, lw * 0.7, 0.85);
-      stroke(isoPath(sw, SVG_N, 0, pw, ph), colNode, lw * 1.6, 1);
+      stroke(rings, colContour, lw * 0.7, +P.copac.toFixed(3));
+      if (showNodes) stroke(isoPath(sw, SVG_N, 0, pw, ph), colNode, lw * 1.6, 1);
     } else {
       stroke(isoPath(sw, SVG_N, 0, pw, ph), hex(PAL_HI[palette] || PAL_HI[0]), lw, 1);
     }
@@ -5357,15 +5463,20 @@ btnRec.addEventListener('click', () => {
   }
 
   const stream = canvas.captureStream(60);
-  const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+  // mp4 (h.264) first: it plays everywhere and imports into any editor. chrome
+  // and safari record it natively; a browser that cannot falls back to webm
+  const mime = ['video/mp4;codecs=avc1.640033', 'video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1.4d0028',
+                'video/mp4;codecs=avc1.42E01E', 'video/mp4',
+                'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
     .find(m => MediaRecorder.isTypeSupported(m));
+  const ext = mime && mime.startsWith('video/mp4') ? 'mp4' : 'webm';
   recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: P.bitrate * 1e6 });
   recChunks = [];
   recorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
   recorder.onstop = () => {
-    const blob = new Blob(recChunks, { type: 'video/webm' });
+    const blob = new Blob(recChunks, { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
     const a2 = document.createElement('a');
-    a2.download = 'chladni-' + Date.now() + '.webm';
+    a2.download = 'chladni-' + Date.now() + '.' + ext;
     a2.href = URL.createObjectURL(blob);
     a2.click();
     setTimeout(() => URL.revokeObjectURL(a2.href), 5000);
