@@ -614,6 +614,56 @@
   .wave-pick button.tool { padding: 7px 4px; }
   .lfo-wave button { padding: 6px 2px; }
 
+  /* ==================================================================
+     phones: the panel becomes a sheet across the foot of the screen and the
+     plate is fitted above it. --sheet-off is the height the sheet takes
+     while it is up (0 when it is down), kept by the script.
+     ================================================================== */
+  #canvas { touch-action: none; }
+  :root { --sheet-off: 0px; }
+  @media (max-width: 760px) {
+    #panel {
+      top: auto; left: 0; right: 0; width: auto;
+      height: 50vh; height: 50dvh;
+      border-left: none; border-top: 1px solid var(--line-strong);
+      border-radius: 10px 10px 0 0;
+    }
+    #panel.hidden { transform: translateY(100%); }
+    #paneltoggle, body.panel-hidden #paneltoggle { top: 10px; right: 12px; }
+    #findtoggle, body.panel-hidden #findtoggle { top: 10px; right: 58px; padding: 7px 9px; }
+    #findtoggle kbd { display: none; }
+    #header { padding: 14px 14px; }
+    #header h1 { font-size: 12px; letter-spacing: 0.25em; }
+    #header .sub { display: none; }
+    #recbadge { top: 52px; }
+    #spec-top, body.panel-hidden #spec-top { top: 50px; left: 12px; right: 12px; }
+    .pin-dock, body.panel-hidden .pin-dock {
+      left: 12px; right: 12px; bottom: calc(var(--sheet-off) + 8px);
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+    #status {
+      right: 0; bottom: var(--sheet-off); padding: 6px 14px 8px;
+      font-size: 9.5px; letter-spacing: 0.08em; line-height: 1.6;
+    }
+    body.has-dock #status { bottom: calc(var(--sheet-off) + var(--dock-h, 0px) + 8px); }
+    .st-pop, body:not(.has-dock) .st-pop {
+      left: 12px; right: 12px; width: auto;
+      bottom: calc(var(--sheet-off) + var(--dock-h, 0px) + 48px);
+    }
+    .tab-btn { letter-spacing: 0.1em; }
+    .param-search { padding-top: 56px; }
+  }
+  /* fingers, not a mouse: bigger thumbs, controls that never wait for a hover,
+     and text that is large enough that ios does not zoom in on focus */
+  @media (pointer: coarse) {
+    input[type="range"] { height: 28px; }
+    input[type="range"]::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -8px; }
+    input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; }
+    select, input[type=text], input[type=number], input[type=search] { font-size: 16px; }
+    .dk-x { opacity: 1; }
+    button.moderow { padding: 6px 4px; }
+  }
+
 </style>
 </head>
 <body>
@@ -662,6 +712,10 @@
         <option value="disc" selected>disc</option>
         <option value="ring">ring / annulus</option>
         <option value="tri">equilateral triangle</option>
+        <option value="pent">pentagon</option>
+        <option value="hex">hexagon</option>
+        <option value="hept">heptagon</option>
+        <option value="oct">octagon</option>
       </select>
       <div class="sublabel">edge condition</div>
       <div class="toolrow grid2">
@@ -689,8 +743,11 @@
         the rectangle is built from <b>beam eigenfunctions</b> along each axis (a Ritz
         approximation). the disc uses Bessel functions; the clamped disc also needs the modified
         Bessel function I<sub>n</sub>. the <b>ring</b> is supported on both edges, and the
-        <b>equilateral triangle</b> uses its exact (Lamé) modes, built from six plane waves. both are
-        only available with supported edges here.<br><br>
+        <b>equilateral triangle</b> uses its exact (Lamé) modes, built from six plane waves. the
+        <b>pentagon</b> to <b>octagon</b> have no closed-form modes, so they are solved numerically when
+        first chosen (about a second): each mode is a sum of Bessel functions about the centre,
+        tuned until it vanishes along every edge. all of these are only available with supported
+        edges here.<br><br>
         <b>on-screen size</b> changes the size of the plate, not the zoom. the drive frequency sets
         the wavelength, so a smaller plate holds fewer wavelengths: every mode frequency rises as
         <code>1/s²</code> (<code>1/s</code> for a membrane), and at a fixed drive the figure gets
@@ -735,7 +792,7 @@
         driver and watch modes drop out of the list. on a free plate every mode moves at the corners,
         so a corner drive excites all of them.<br><br>
         <b>shift-click</b> the plate to place a damping finger (up to four; shift-click one again to
-        remove it). a finger lowers the Q of each mode that moves under it and also weakens the
+        remove it). on a touch screen, press and hold the plate instead. a finger lowers the Q of each mode that moves under it and also weakens the
         drive's coupling to that mode, so at high <b>finger damping</b> a mode with an antinode under
         the finger is suppressed completely. a mode with a node at that point is unaffected, which
         lets you isolate one member of a degenerate pair by hand.
@@ -754,6 +811,11 @@
         goes as <code>p² + pq + q²</code>. the <code>′</code> twin is the antisymmetric partner. it only
         exists when p ≠ q, which is why the diagonal modes are single and all the others come in
         degenerate pairs.<br><br>
+        <b>pentagon … octagon (class,s)</b>: the polygon's symmetry sorts its modes into classes,
+        and <i>s</i> counts up through each. <b>A1</b> modes have the full symmetry of the plate,
+        <b>A2</b> and <b>B</b> modes flip sign between mirror lines, and <b>E<i>m</i></b> modes have
+        <i>m</i>-fold waves around the centre and come in degenerate pairs (the <code>′</code> twin),
+        like the disc's.<br><br>
         <b>disc / ring (n,s)</b>: <i>n</i> nodal <b>diameters</b> (straight lines through the centre)
         and <i>s</i> nodal <b>circles</b>. a trailing <code>′</code> marks the rotated twin: the same
         frequency, turned by 90°/n. the drive position decides how the two combine.<br><br>
@@ -888,6 +950,14 @@
         <button class="tool active" data-lmat="gloss">gloss</button>
         <button class="tool" data-lmat="water">water</button>
       </div>
+      <div class="toolrow" id="liquidform">
+        <button class="tool active" data-lform="contours">contours</button>
+        <button class="tool" data-lform="nodes">nodal lines</button>
+      </div>
+      <div class="toolrow" id="liquidbase">
+        <button class="tool active" data-lbase="plate">base: plate</button>
+        <button class="tool" data-lbase="pool">base: liquid</button>
+      </div>
       <div class="colorrow" id="contourcols">
         <label for="col-contour">contours<input type="color" id="col-contour" value="#3d6b9e"></label>
         <label for="col-node" id="lbl-node">nodal lines<input type="color" id="col-node" value="#ffd173"></label>
@@ -912,11 +982,15 @@
         under them and <b>plate opacity</b> how much of it covers the canvas colour: at 1 the canvas
         no longer shows through. <b>contour opacity</b> does the same for the contour lines over the
         plate.<br><br>
-        <b>liquid</b> fills the nodal channels with a reflective liquid. <b>fill</b> sets the amount,
-        <b>depth</b> the height of the beads, <b>light angle</b> the direction of the main light.
+        <b>liquid</b> lays a reflective liquid along the figure. <b>contours</b> beads it along the
+        contour lines — one ring of liquid per level, the nodal lines among them — with <b>contour
+        levels</b> setting how many; <b>nodal lines</b> fills only the nodal channels, where the sand
+        would gather. <b>fill</b> sets how wide the beads run, <b>depth</b> their height, <b>light angle</b> the direction of the main light.
         <b>gloss</b> is a resin tinted with the sand colour, and <b>water</b> is clear and refracts
         the plate beneath. <b>liquid motion</b> sets the liquid moving: the shores breathe with the
-        plate's slowed oscillation and ripples run along the channels. at zero it lies still. <b>plate</b> and <b>grid</b> set the colours of that
+        plate's slowed oscillation and ripples run along the channels. at zero it lies still.
+        <b>base: liquid</b> floods the whole plate with a thin film first, so the figure stands up out of
+        a pool instead of off the bare sheet. <b>plate</b> and <b>grid</b> set the colours of that
         surface, and <b>plate grid</b> the number of grid cells across it (0 turns the grid off).<br><br>
         <b>morph time</b> makes changes settle the way a real plate does: each mode's amplitude moves
         to its new value with that mode's own time constant, Q / (π f). low, sharp modes change
@@ -1386,6 +1460,280 @@ function profSample(row, s) {
   return profData[o] + (b - profData[o]) * f;
 }
 
+/* ---- regular polygons — pentagon to octagon ----
+   no closed form exists, so the supported (dirichlet) modes are solved
+   numerically by the method of particular solutions (betcke & trefethen):
+   each mode is a fourier–bessel sum Σ c_n J_n(kr) trig(nθ) about the centre,
+   which satisfies the plate equation exactly, and k is tuned until some
+   combination vanishes on the rim. the polygon's symmetry splits the orders
+   n into classes (n ≡ ±m mod N), each solved on its own: classes 0 < m < N/2
+   come in degenerate pairs, the rest are single. a straight-edged plate under
+   simple support has the membrane's mode shapes, so one solve serves both
+   dispersions. it costs about a second, so it runs in a worker and is cached
+   per polygon. these functions are self-contained: the worker is built from
+   their source. */
+const POLY_SIDES = { pent: 5, hex: 6, hept: 7, oct: 8 };
+const POLY_KMAX = 26;      // the disc's range, for comparable mode counts
+const POLY_PG = 192;       // raster per mode
+
+// J_0 … J_nmax at x, by miller's backward recurrence
+function polyBessel(nmax, x, out) {
+  out.fill(0, 0, nmax + 1);
+  if (x < 1e-12) { out[0] = 1; return out; }
+  const big = Math.max(nmax, x);
+  const M = 2 * Math.floor((big + 16 + Math.sqrt(40 * big)) / 2);
+  let jp = 0, j = 1e-30, norm = 0;
+  for (let n = M; n > 0; n--) {
+    const jm = 2 * n / x * j - jp;
+    jp = j; j = jm;
+    if (Math.abs(j) > 1e200) {
+      j *= 1e-200; jp *= 1e-200; norm *= 1e-200;
+      for (let i = n; i <= nmax; i++) out[i] *= 1e-200;
+    }
+    if (n - 1 <= nmax) out[n - 1] = j;
+    if (((n - 1) & 1) === 0 && n > 1) norm += 2 * j;
+  }
+  norm += j;
+  for (let i = 0; i <= nmax; i++) out[i] /= norm;
+  return out;
+}
+
+// smallest eigenpair of a symmetric n×n matrix, cyclic jacobi
+function polyEigMin(S, n) {
+  const a = Float64Array.from(S.subarray(0, n * n)), v = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) v[i * n + i] = 1;
+  for (let sweep = 0; sweep < 30; sweep++) {
+    let off = 0;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += a[p * n + q] * a[p * n + q];
+    if (off < 1e-30) break;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
+      const apq = a[p * n + q];
+      if (Math.abs(apq) < 1e-300) continue;
+      const th = (a[q * n + q] - a[p * n + p]) / (2 * apq);
+      const t = (th < 0 ? -1 : 1) / (Math.abs(th) + Math.sqrt(th * th + 1));
+      const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+      for (let k = 0; k < n; k++) {
+        const x = a[k * n + p], y = a[k * n + q];
+        a[k * n + p] = c * x - s * y; a[k * n + q] = s * x + c * y;
+      }
+      for (let k = 0; k < n; k++) {
+        const x = a[p * n + k], y = a[q * n + k];
+        a[p * n + k] = c * x - s * y; a[q * n + k] = s * x + c * y;
+      }
+      for (let k = 0; k < n; k++) {
+        const x = v[k * n + p], y = v[k * n + q];
+        v[k * n + p] = c * x - s * y; v[k * n + q] = s * x + c * y;
+      }
+    }
+  }
+  let b = 0;
+  for (let i = 1; i < n; i++) if (a[i * n + i] < a[b * n + b]) b = i;
+  const vec = new Float64Array(n);
+  for (let i = 0; i < n; i++) vec[i] = v[i * n + b];
+  return { val: a[b * n + b], vec };
+}
+
+// every mode with k ≤ kmax, on the polygon of circumradius 1 with a vertex on +x
+function polySolve(N, kmax) {
+  const TAU = 2 * Math.PI, EXTRA = 20, SEG = 3, STEP = 0.04;
+  const ap = Math.cos(Math.PI / N);
+  const nmax = Math.ceil(kmax) + EXTRA + SEG;
+  const jb = new Float64Array(nmax + 1);
+  const classes = [];
+  for (let m = 0; m <= N / 2; m++) {
+    const single = m === 0 || 2 * m === N;
+    classes.push({ m, sin: false, pair: !single });
+    if (single) classes.push({ m, sin: true, pair: false });
+  }
+  const out = [];
+  for (const cl of classes) {
+    const ns = [];
+    for (let n = 0; n <= nmax; n++) {
+      const r = n % N;
+      if ((r === cl.m || r === (N - cl.m) % N) && !(cl.sin && n === 0)) ns.push(n);
+    }
+    const J = ns.length;
+    // rim points over the upper half, by arclength on a golden-ratio sequence: a
+    // regular grid lands on its own mirror images under the polygon's symmetries,
+    // and then sees fewer independent functions than there are
+    const pts = [];
+    const nB = Math.max(4 * J + 8, 48);
+    for (let i = 0; i < nB; i++) {
+      const sl = ((i + 0.5) * 0.6180339887498949 % 1) * N / 2;
+      const e = Math.floor(sl), f = sl - e;
+      const a0 = TAU * e / N, a1 = TAU * (e + 1) / N;
+      const x = (1 - f) * Math.cos(a0) + f * Math.cos(a1), y = (1 - f) * Math.sin(a0) + f * Math.sin(a1);
+      pts.push([Math.hypot(x, y), Math.atan2(y, x)]);
+    }
+    // and interior points, so the trivial zero function is ruled out
+    const nI = Math.max(2 * J + 6, 28);
+    for (let i = 0; i < nI; i++) {
+      const u = (i + 0.5) * 0.7548776662466927 % 1, v = (i + 0.5) * 0.5698402909980532 % 1;
+      const th = Math.PI * (0.05 + 0.9 * v);
+      const e = Math.floor(th / (TAU / N));
+      const rb = ap / Math.cos(th - (2 * e + 1) * Math.PI / N);
+      pts.push([rb * (0.15 + 0.75 * Math.sqrt(u)), th]);
+    }
+    const mR = pts.length;
+    const A = new Float64Array(mR * J), R = new Float64Array(J * J), G = new Float64Array(J * J);
+
+    // σ(k): the smallest singular value of the rim block of an orthonormal basis
+    // for the span — near zero exactly where k is an eigenvalue
+    const sigma = (k, use) => {
+      const J = use.length, top = use[J - 1], tr = use.trig;
+      for (let i = 0; i < mR; i++) {
+        polyBessel(top, k * pts[i][0], jb);
+        for (let j = 0; j < J; j++) A[i * J + j] = jb[use[j]] * tr[i * J + j];
+      }
+      // gram–schmidt twice; a column that is numerically a combination of the
+      // ones before it is dropped, or its rounding noise reads as a false zero
+      R.fill(0);
+      const keep = [];
+      for (let j = 0; j < J; j++) {
+        let s0 = 0;
+        for (let i = 0; i < mR; i++) s0 += A[i * J + j] * A[i * J + j];
+        for (let pass = 0; pass < 2; pass++) for (const l of keep) {
+          let d = 0;
+          for (let i = 0; i < mR; i++) d += A[i * J + l] * A[i * J + j];
+          R[l * J + j] += d;
+          for (let i = 0; i < mR; i++) A[i * J + j] -= d * A[i * J + l];
+        }
+        let s = 0;
+        for (let i = 0; i < mR; i++) s += A[i * J + j] * A[i * J + j];
+        if (!(s > 1e-22 * s0) || s0 < 1e-300) continue;
+        s = Math.sqrt(s);
+        R[j * J + j] = s;
+        for (let i = 0; i < mR; i++) A[i * J + j] /= s;
+        keep.push(j);
+      }
+      const K = keep.length;
+      for (let p = 0; p < K; p++) for (let q = p; q < K; q++) {
+        const a = keep[p], b = keep[q];
+        let d = 0;
+        for (let i = 0; i < nB; i++) d += A[i * J + a] * A[i * J + b];
+        G[p * K + q] = G[q * K + p] = d;
+      }
+      const e = polyEigMin(G, K);
+      e.s = Math.sqrt(Math.max(0, e.val));
+      // the coefficients in the original basis: R c = v over the kept columns
+      e.coef = () => {
+        const c = new Float64Array(J);
+        for (let p = K - 1; p >= 0; p--) {
+          const j = keep[p];
+          let s = e.vec[p];
+          for (let q = p + 1; q < K; q++) s -= R[j * J + keep[q]] * c[keep[q]];
+          c[j] = s / R[j * J + j];
+        }
+        return c;
+      };
+      return e;
+    };
+
+    // scan in segments, each with a basis sized for its top end: orders far past
+    // k only lose precision, and a basis that changed mid-scan would kink σ(k)
+    const found = [];
+    for (let k0 = 0.8; k0 < kmax; k0 += SEG) {
+      const use = ns.filter(n => n <= Math.ceil(k0 + SEG) + EXTRA);
+      use.trig = new Float64Array(mR * use.length);
+      for (let i = 0; i < mR; i++) for (let j = 0; j < use.length; j++)
+        use.trig[i * use.length + j] = cl.sin ? Math.sin(use[j] * pts[i][1]) : Math.cos(use[j] * pts[i][1]);
+      let p2 = null, p1 = null;
+      for (let k = k0 - STEP; k <= k0 + SEG + STEP; k += STEP) {
+        const s = sigma(k, use).s;
+        if (p2 && p1 && p1.s < p2.s && p1.s <= s && p1.k >= k0 && p1.k < k0 + SEG) {
+          // golden-section down onto the minimum
+          const g = 0.6180339887498949;
+          let lo = p1.k - STEP, hi = p1.k + STEP;
+          let x1 = hi - g * (hi - lo), x2 = lo + g * (hi - lo);
+          let f1 = sigma(x1, use).s, f2 = sigma(x2, use).s;
+          for (let it = 0; it < 36; it++) {
+            if (f1 < f2) { hi = x2; x2 = x1; f2 = f1; x1 = hi - g * (hi - lo); f1 = sigma(x1, use).s; }
+            else { lo = x1; x1 = x2; f1 = f2; x2 = lo + g * (hi - lo); f2 = sigma(x2, use).s; }
+          }
+          const kk = 0.5 * (lo + hi), r = sigma(kk, use);
+          // a true eigenvalue drives σ to ~1e-3 or below; shallow dips are not
+          // modes. two segments can both see one minimum near their seam
+          if (r.s < 0.04 && kk <= kmax && !found.some(f => Math.abs(f.k - kk) < 2e-3))
+            found.push({ k: kk, ns: use.slice(), c: Array.from(r.coef()) });
+        }
+        p2 = p1; p1 = { k, s };
+      }
+    }
+    found.sort((a, b) => a.k - b.k);
+    found.forEach((f, i) => out.push({ k: f.k, m: cl.m, sin: cl.sin, pair: cl.pair, ord: i + 1, ns: f.ns, c: f.c }));
+  }
+  out.sort((a, b) => a.k - b.k);
+  return out;
+}
+
+/* rasterise the solved modes onto the plate box, PG² texels each, flat edge
+   down. a degenerate pair's partner is the same sum with sines, the terms of
+   order ≡ −m mod N negated (the imaginary part of one complex eigenfunction).
+   the sums are continued past the rim, so bilinear filtering stays smooth
+   across it. each mode is normalised to a peak of 1 on the plate. */
+function polyRaster(N, sol, PG) {
+  const TAU = 2 * Math.PI;
+  const th0 = -Math.PI / 2 - Math.PI / N;          // a vertex at θ0 puts an edge at the bottom
+  const ap = Math.cos(Math.PI / N);
+  const layers = [];
+  for (const s of sol) {
+    layers.push({ s, twin: false });
+    if (s.pair) layers.push({ s, twin: true });
+  }
+  const L = layers.length, P2 = PG * PG;
+  const data = new Float32Array(L * P2);
+  let nmax = 0;
+  for (const s of sol) nmax = Math.max(nmax, s.ns[s.ns.length - 1]);
+  // per texel: radius, inside flag, and cos / sin of every order
+  const rr = new Float32Array(P2), ins = new Uint8Array(P2);
+  const cs = new Float32Array(P2 * (nmax + 1)), sn = new Float32Array(P2 * (nmax + 1));
+  for (let j = 0; j < PG; j++) for (let i = 0; i < PG; i++) {
+    const t = j * PG + i;
+    const cx = (i + 0.5) / PG * 2 - 1, cy = (j + 0.5) / PG * 2 - 1;
+    rr[t] = Math.hypot(cx, cy);
+    const th = Math.atan2(cy, cx) - th0;
+    let inside = true;
+    for (let e = 0; e < N; e++) {
+      const a = -Math.PI / 2 + TAU * e / N;
+      if (cx * Math.cos(a) + cy * Math.sin(a) > ap) { inside = false; break; }
+    }
+    ins[t] = inside ? 1 : 0;
+    for (let n = 0; n <= nmax; n++) { cs[t * (nmax + 1) + n] = Math.cos(n * th); sn[t * (nmax + 1) + n] = Math.sin(n * th); }
+  }
+  // radial tables J_n(k r), r ∈ [0, √2]
+  const RT = 2048, RMAX = Math.SQRT2;
+  const jb = new Float64Array(nmax + 1);
+  const meta = [];
+  for (let l = 0; l < L; l++) {
+    const { s, twin } = layers[l];
+    const J = s.ns.length, top = s.ns[J - 1];
+    const tab = new Float64Array((RT + 1) * J);
+    for (let q = 0; q <= RT; q++) {
+      polyBessel(top, s.k * RMAX * q / RT, jb);
+      for (let j = 0; j < J; j++) tab[q * J + j] = jb[s.ns[j]];
+    }
+    const useSin = s.sin || twin;
+    const sg = s.ns.map(n => twin && n % N !== s.m ? -1 : 1);
+    const o = l * P2;
+    let mx = 0;
+    for (let t = 0; t < P2; t++) {
+      const u = rr[t] / RMAX * RT, q = Math.min(RT - 1, u | 0), f = u - q;
+      const trig = useSin ? sn : cs, b = t * (nmax + 1);
+      let v = 0;
+      for (let j = 0; j < J; j++) {
+        const jv = tab[q * J + j] + (tab[(q + 1) * J + j] - tab[q * J + j]) * f;
+        v += s.c[j] * sg[j] * jv * trig[b + s.ns[j]];
+      }
+      data[o + t] = v;
+      if (ins[t] && Math.abs(v) > mx) mx = Math.abs(v);
+    }
+    const sc = mx > 0 ? 1 / mx : 0;
+    for (let t = 0; t < P2; t++) data[o + t] = Math.max(-2, Math.min(2, data[o + t] * sc));
+    meta.push({ k: s.k, m: s.m, sin: s.sin, pair: s.pair, ord: s.ord, twin });
+  }
+  return { meta, data };
+}
+
 /* ================================================================
    shaders
    ================================================================ */
@@ -1394,14 +1742,28 @@ const VERT_QUAD = `#version 300 es
 layout(location=0) in vec2 a_pos;
 void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
 
+// the regular polygon's outline, flat edge down, inscribed in the plate box
+const GLSL_POLY = `
+bool polyInside(vec2 q) {
+  vec2 c = q * 2.0 - 1.0;
+  float n = float(uSides), ap = cos(PI / n);
+  for (int j = 0; j < 8; j++) {
+    if (j >= uSides) break;
+    float a = -0.5 * PI + 2.0 * PI * float(j) / n;
+    if (dot(c, vec2(cos(a), sin(a))) > ap) return false;
+  }
+  return true;
+}`;
+
 const FRAG_FIELD = `#version 300 es
 precision highp float;
 precision highp sampler2D;
+precision highp sampler2DArray;
 out vec4 fragColor;
 
 uniform vec4  uMode[${MAXMODES}];   // rect: (rowX, rowY, amp, -) · disc: (n, row, amp, psi) · tri: (m, n, amp, -)
 uniform int   uCount;
-uniform int   uGeom;      // 0 rectangle, 1 disc / ring, 2 right triangle
+uniform int   uGeom;      // 0 rectangle, 1 disc / ring, 2 equilateral triangle, 3 regular polygon
 uniform sampler2D uRms;
 uniform sampler2D uProf;  // 1-d profile bank: beam functions or radial bessel
 uniform vec2  uOrigin;    // plate origin in px
@@ -1416,10 +1778,13 @@ uniform vec3  uBg;
 uniform vec2  uFinger[4];
 uniform int   uFingerN;
 uniform float uRot;       // plate rotation, radians
+uniform highp sampler2DArray uPoly;   // polygon modes, one layer each
+uniform int   uSides;
 
 const float PI = 3.14159265359;
 const float TAU3 = 2.09439510239;      // 2π/3
 const int PROF_W = ${PROF_W};
+${GLSL_POLY}
 
 float prof(int row, float s) {
   float t = clamp(s, 0.0, 1.0) * float(PROF_W - 1);
@@ -1464,6 +1829,8 @@ void main() {
   } else if (uGeom == 2) {
     // equilateral triangle inscribed in the plate box
     inside = q.x >= 0.0 && q.x <= 1.0 && q.y >= 0.0 && q.y <= 2.0 * q.x && q.y <= 2.0 - 2.0 * q.x;
+  } else if (uGeom == 3) {
+    inside = polyInside(q);
   } else {
     inside = q.x >= 0.0 && q.x <= 1.0 && q.y >= 0.0 && q.y <= 1.0;
   }
@@ -1488,6 +1855,8 @@ void main() {
         s += ((j < 3) ? 1.0 : -1.0) * ((m.w > 0.5) ? cos(ph) : sin(ph));
       }
       shape = s;
+    } else if (uGeom == 3) {
+      shape = textureLod(uPoly, vec3(q, m.x), 0.0).r;
     } else {
       shape = prof(int(m.x), q.x) * prof(int(m.y), q.y);
     }
@@ -1610,6 +1979,99 @@ const texProf = makeTex(PROF_W, PROF_ROWS, profData, false);
 function uploadProfiles() {
   gl.bindTexture(gl.TEXTURE_2D, texProf);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, PROF_W, PROF_ROWS, gl.RED, gl.FLOAT, profData);
+}
+
+// polygon modes: one filtered layer per mode, a single 1-texel layer until one is solved
+const texPoly = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D_ARRAY, texPoly);
+gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.R16F, 1, 1, 1, 0, gl.RED, gl.FLOAT, new Float32Array(1));
+gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+let polyOnGpu = 0;                 // which polygon's layers are uploaded
+function bindPoly(unit) {
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, texPoly);
+}
+
+function polySides() { return POLY_SIDES[geom] || 0; }
+/* rasters by side count. a raster is ~20 MB, so only the two most recent are
+   kept — enough for an lfo flipping between two plates; the worker keeps its
+   solves, so going back to an evicted one only costs the raster */
+const polyCache = new Map();
+let polyBusy = 0;                  // side count the worker is on, 0 when idle
+let polyWorker = null;
+function polyWorkerGet() {
+  if (polyWorker !== null) return polyWorker;
+  try {
+    const src = [polyBessel, polyEigMin, polySolve, polyRaster].map(f => f.toString()).join('\n') + `
+      const sols = {};
+      onmessage = e => {
+        const { N, kmax, PG } = e.data;
+        const sol = sols[N] || (sols[N] = polySolve(N, kmax));
+        const r = polyRaster(N, sol, PG);
+        postMessage({ N, meta: r.meta, data: r.data }, [r.data.buffer]);
+      };`;
+    polyWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    polyWorker.onmessage = e => polyArrived(e.data);
+    polyWorker.onerror = () => { polyWorker = false; const N = polyBusy; polyBusy = 0; if (N) polyRequest(N); };
+  } catch (err) {
+    polyWorker = false;            // no workers here: solve on the main thread
+  }
+  return polyWorker;
+}
+function polyRequest(N) {
+  if (polyBusy === N) return;
+  const w = polyWorkerGet();
+  if (!w) {
+    const r = polyRaster(N, polySolve(N, POLY_KMAX), POLY_PG);
+    polyArrived({ N, meta: r.meta, data: r.data });
+    return;
+  }
+  if (polyBusy) return;            // one job at a time; polyArrived picks up the next
+  polyBusy = N;
+  w.postMessage({ N, kmax: POLY_KMAX, PG: POLY_PG });
+}
+function polyArrived(r) {
+  polyBusy = 0;
+  polyCache.delete(r.N);
+  polyCache.set(r.N, r);
+  while (polyCache.size > 2) polyCache.delete(polyCache.keys().next().value);
+  const N = polySides();
+  if (!N) return;
+  if (N !== r.N && !polyCache.has(N)) { polyRequest(N); return; }
+  // the plate is (still, or now) this polygon: build its modes for real
+  buildCatalogue(); solveModes(); drawSpectrum(); updateTags();
+}
+function uploadPoly(N, r) {
+  if (polyOnGpu === N) return;
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, texPoly);
+  gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.R16F, POLY_PG, POLY_PG, r.meta.length, 0, gl.RED, gl.FLOAT, r.data);
+  polyOnGpu = N;
+}
+// bilinear sample of one mode's raster, as the gpu filters it
+function polySample(layer, x, y) {
+  const r = polyCache.get(polySides());
+  if (!r) return 0;
+  const G = POLY_PG;
+  let u = x * G - 0.5, v = y * G - 0.5;
+  u = Math.min(G - 1.001, Math.max(0, u));
+  v = Math.min(G - 1.001, Math.max(0, v));
+  const i = u | 0, j = v | 0, fu = u - i, fv = v - j, o = layer * G * G;
+  const d = r.data;
+  const a = d[o + j * G + i], b = d[o + j * G + i + 1];
+  const c = d[o + (j + 1) * G + i], e = d[o + (j + 1) * G + i + 1];
+  return (a + (b - a) * fu) * (1 - fv) + (c + (e - c) * fu) * fv;
+}
+// inside the regular N-gon inscribed in the plate box, flat edge down; s < 1 shrinks it
+function polyInside(N, x, y, s = 1) {
+  const cx = x * 2 - 1, cy = y * 2 - 1, ap = Math.cos(Math.PI / N) * s;
+  for (let e = 0; e < N; e++) {
+    const a = -Math.PI / 2 + TAU * e / N;
+    if (cx * Math.cos(a) + cy * Math.sin(a) > ap) return false;
+  }
+  return true;
 }
 
 /* ================================================================
@@ -1790,6 +2252,7 @@ const EDGES_FOR = {
   disc: ['free', 'supported', 'clamped'],
   ring: ['supported'],
   tri:  ['supported'],
+  pent: ['supported'], hex: ['supported'], hept: ['supported'], oct: ['supported'],
 };
 
 function ringInner() { return geom === 'ring' ? P.inner : 0; }
@@ -1854,6 +2317,21 @@ function buildCatalogue() {
         list.push({ p: n, q: row, psi: 0, F, label: lab });
         if (n > 0) list.push({ p: n, q: row, psi: Math.PI / 2, F, label: lab + '′' });
       }
+    }
+
+  } else if (polySides()) {
+    // regular polygon — solved off the main thread; until it lands the plate is quiet
+    const N = polySides(), r = polyCache.get(N);
+    if (!r) polyRequest(N);
+    else {
+      uploadPoly(N, r);
+      const CLS = m => m === 0 ? 'A' : 2 * m === N ? 'B' : 'E' + m;
+      r.meta.forEach((mm, layer) => {
+        const k2 = mm.k * mm.k;
+        const name = mm.pair ? CLS(mm.m) : CLS(mm.m) + (mm.sin ? '2' : '1');
+        list.push({ p: layer, q: 0, psi: 0, F: toF(k2),
+                    label: '(' + name + ',' + mm.ord + ')' + (mm.twin ? '′' : '') });
+      });
     }
 
   } else {
@@ -2010,6 +2488,7 @@ function unitToFreq(u, lo, hi) {
 // modal shape at an arbitrary point — mirrors the shader exactly
 function shapeAt(m, x, y) {
   if (geom === 'rect') return profSample(m.p, x) * profSample(m.q, y);
+  if (polySides()) return polySample(m.p, x, y);
   if (geom === 'tri') {
     if (y < 0 || y > 2 * x || y > 2 - 2 * x) return 0;
     const X = x, Y = y * TRI_H;                    // plate box → unit-side triangle
@@ -2037,6 +2516,12 @@ function drivePoint() {
   let x = Math.min(1, Math.max(0, P.dx)), y = Math.min(1, Math.max(0, P.dy));
   if (geom === 'tri') {
     y = Math.max(0, Math.min(y, Math.min(2 * x, 2 - 2 * x)));
+  } else if (polySides()) {
+    // pull a point outside back toward the centre until it is just on the plate
+    const N = polySides();
+    let s = 1;
+    while (s > 0.05 && !polyInside(N, 0.5 + (x - 0.5) * s, 0.5 + (y - 0.5) * s, 0.99)) s *= 0.97;
+    x = 0.5 + (x - 0.5) * s; y = 0.5 + (y - 0.5) * s;
   } else if (geom === 'disc' || geom === 'ring') {
     const a = ringInner();
     let cx = x * 2 - 1, cy = y * 2 - 1;
@@ -2187,7 +2672,7 @@ function computeRms() {
   if (M === 0 || np === 0) { rmsPeak = 1; dispScale = 1; uploadRms(); return; }
 
   const W = new Float32Array(M);
-  const rect = geom === 'rect', tri = geom === 'tri';
+  const rect = geom === 'rect', tri = geom === 'tri', sides = polySides();
 
   // separable shapes on a rectangle — precompute the 1-d factors once per axis
   let tx = null, ty = null;
@@ -2227,6 +2712,9 @@ function computeRms() {
           }
           W[i] = s;
         }
+      } else if (sides) {
+        if (!polyInside(sides, x, y)) { rmsGrid[gy * GRID + gx] = 0; continue; }
+        for (let i = 0; i < M; i++) W[i] = polySample(A[i].p, x, y);
       } else {
         const cx = x * 2 - 1, cy = y * 2 - 1, r = Math.hypot(cx, cy);
         if (r > 1 || r < inner) { rmsGrid[gy * GRID + gx] = 0; continue; }
@@ -2331,6 +2819,8 @@ function placeGrain(i) {
     let r1 = Math.random(), r2 = Math.random();
     if (r1 + r2 > 1) { r1 = 1 - r1; r2 = 1 - r2; }
     x = r1 + 0.5 * r2; y = r2;
+  } else if (polySides()) {
+    do { x = Math.random(); y = Math.random(); } while (!polyInside(polySides(), x, y, 0.995));
   } else {
     x = Math.random(); y = Math.random();
   }
@@ -2404,13 +2894,15 @@ function ensureEven(n) {
   if (key === evenKey) return;
   evenKey = key;
   if (!evenTab) evenTab = new Float32Array(MAXGRAINS * 2);
-  const round = geom === 'disc' || geom === 'ring', tri = geom === 'tri';
+  const round = geom === 'disc' || geom === 'ring', tri = geom === 'tri', sides = polySides();
   const inside = (x, y) => {
     if (round) { const r = Math.hypot(x * 2 - 1, y * 2 - 1); return r <= 0.99 && r >= inner * 1.01; }
     if (tri) return y >= 0 && 2 * x - y >= 0 && 2 * x + y <= 2;
+    if (sides) return polyInside(sides, x, y, 0.99);
     return x >= 0 && x <= 1 && y >= 0 && y <= 1;
   };
-  const area = round ? Math.PI / 4 * (0.98 - inner * inner) : tri ? 0.5 : 1;
+  const area = round ? Math.PI / 4 * (0.98 - inner * inner) : tri ? 0.5
+             : sides ? sides / 8 * Math.sin(TAU / sides) * 0.98 : 1;
   const jit = 0.3 * Math.sqrt(area / Math.max(1, n));
   const a1 = 0.7548776662466927, a2 = 0.5698402909980532;   // 1/g, 1/g² for g³ = g + 1
   let k = 0;
@@ -2459,8 +2951,22 @@ function recycleRange(lo, hi, slot, dt) {
 }
 
 // keep a grain on the plate: pull it in off the rim, reflect it off a straight edge
-function confine(ix, x, y, round, tri, inner) {
-  if (round) {
+function confine(ix, x, y, round, tri, inner, sides) {
+  if (sides) {
+    // reflect back across whichever edges were crossed
+    const ap = Math.cos(Math.PI / sides) * 0.998;
+    let cx = x * 2 - 1, cy = y * 2 - 1;
+    for (let it = 0; it < 3; it++) {
+      let out = false;
+      for (let e = 0; e < sides; e++) {
+        const a = -Math.PI / 2 + TAU * e / sides, nx = Math.cos(a), ny = Math.sin(a);
+        const d = cx * nx + cy * ny - ap;
+        if (d > 0) { cx -= 2 * d * nx; cy -= 2 * d * ny; out = true; }
+      }
+      if (!out) break;
+    }
+    x = 0.5 + 0.5 * cx; y = 0.5 + 0.5 * cy;
+  } else if (round) {
     const cx = x * 2 - 1, cy = y * 2 - 1, r = Math.hypot(cx, cy);
     if (r > 0.995)      { x = 0.5 + 0.5 * cx / r * 0.99;  y = 0.5 + 0.5 * cy / r * 0.99; }
     else if (r < inner && r > 1e-6) {
@@ -2489,10 +2995,10 @@ function confine(ix, x, y, round, tri, inner) {
    the figure dissolves into a moving spread rather than a still one */
 function shakeGrains(lo, hi, dt) {
   const j = P.jitter * 1.8 * dt;
-  const round = geom === 'disc' || geom === 'ring', tri = geom === 'tri', inner = ringInner();
+  const round = geom === 'disc' || geom === 'ring', tri = geom === 'tri', inner = ringInner(), sides = polySides();
   for (let i = lo; i < hi; i++) {
     const ix = i * 2;
-    confine(ix, gpos[ix] + (Math.random() - 0.5) * j, gpos[ix + 1] + (Math.random() - 0.5) * j, round, tri, inner);
+    confine(ix, gpos[ix] + (Math.random() - 0.5) * j, gpos[ix + 1] + (Math.random() - 0.5) * j, round, tri, inner, sides);
   }
 }
 
@@ -2504,7 +3010,7 @@ function moveGrains(lo, hi, dir, dt) {
   const thr = P.hop;
   const round = geom === 'disc' || geom === 'ring';
   const tri = geom === 'tri';
-  const inner = ringInner();
+  const inner = ringInner(), sides = polySides();
 
   for (let i = lo; i < hi; i++) {
     const ix = i * 2, iy = ix + 1;
@@ -2523,7 +3029,7 @@ function moveGrains(lo, hi, dir, dt) {
       x += dir * (gx / gm) * speed * mob + (Math.random() - 0.5) * j;
       y += dir * (gy / gm) * speed * mob + (Math.random() - 0.5) * j;
     }
-    confine(ix, x, y, round, tri, inner);
+    confine(ix, x, y, round, tri, inner, sides);
   }
 }
 
@@ -2587,6 +3093,7 @@ function resize() {
   }
   canvas.width = W; canvas.height = H;
   allocTrailBuffer();
+  measureSheet();
   computeFrame();
 }
 
@@ -2595,27 +3102,42 @@ const PANEL_W = parseFloat(getComputedStyle(document.documentElement)
                   .getPropertyValue('--panel-w')) || 322;
 // css px the pinned-controls row takes off the foot of the view (0 with no pins)
 let dockReserve = 0;
+// on a phone the panel is a sheet over the foot of the view; css px it covers while up
+const sheetMQ = matchMedia('(max-width: 760px)');
+function sheetLayout() { return sheetMQ.matches; }
+let sheetOff = 0;
+function measureSheet() {
+  const up = sheetLayout() && !document.body.classList.contains('panel-hidden');
+  const el = document.getElementById('panel');
+  sheetOff = up && el ? el.offsetHeight : 0;
+  document.documentElement.style.setProperty('--sheet-off', sheetOff + 'px');
+}
+sheetMQ.addEventListener('change', () => resize());
 // and the spectrum bar off the top (0 while the readout lives in the panel)
 let topReserve = 0;
 
 function computeFrame() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   // while capturing, the canvas *is* the frame — no panel inset, no letterbox
-  const panelW = (capturing || document.body.classList.contains('panel-hidden')) ? 0 : PANEL_W * dpr;
+  const panelUp = !capturing && !document.body.classList.contains('panel-hidden');
+  // beside the view on a wide screen; across its foot, as a sheet, on a phone
+  const panelW = panelUp && !sheetLayout() ? PANEL_W * dpr : 0;
+  const sheetH = panelUp && sheetLayout() ? (sheetOff + 26) * dpr : 0;   // and the status line above it
   // a window narrower than the panel (or a backgrounded tab reporting zero)
   // would otherwise give a negative frame — and a negative gl.scissor
   // the dock is a row of the view, not a lid on it: the plate is fitted above it
   const dockH = capturing ? 0 : Math.min(H * 0.5, dockReserve * dpr);
   // likewise the spectrum bar across the top, when it is shown there
-  const topH = capturing ? 0 : Math.min(H * 0.4, topReserve * dpr);
-  const availW = Math.max(1, W - panelW), availH = Math.max(1, H - dockH - topH);
+  // (on a phone the title and buttons take a strip across the top as well)
+  const topH = capturing ? 0 : Math.min(H * 0.4, (topReserve || (sheetLayout() ? 48 : 0)) * dpr);
+  const availW = Math.max(1, W - panelW), availH = Math.max(1, H - dockH - topH - sheetH);
   const a = capturing ? 0 : aspectValue();
   let fw = availW, fh = availH;
   if (a > 0) {
     fw = Math.min(availW, availH * a);
     fh = fw / a;
   }
-  frame_ = [Math.round((availW - fw) / 2), Math.round(dockH + (availH - fh) / 2), Math.round(fw), Math.round(fh)];
+  frame_ = [Math.round((availW - fw) / 2), Math.round(sheetH + dockH + (availH - fh) / 2), Math.round(fw), Math.round(fh)];
 
   // the rectangle stretches to its aspect ratio; the triangle's box is 1 : √3/2
   // so it renders equilateral; everything else is square-boxed
@@ -2625,8 +3147,9 @@ function computeFrame() {
   if (ar >= 1) ph = fit / ar; else pw = fit * ar;
   // a turning box sweeps out its own diagonal; shrink once for the worst case so
   // the corners never clip and the plate does not pulse in size as it spins.
-  // a disc is its own bounding circle, so it needs none of this.
-  if (rotActive() && geom !== 'disc' && geom !== 'ring') {
+  // a disc is its own bounding circle, so it needs none of this; nor does a
+  // regular polygon, which sits inside the same circle.
+  if (rotActive() && geom !== 'disc' && geom !== 'ring' && !polySides()) {
     // fit can come out non-positive in a degenerate window (panel wider than the
     // viewport); never let that flip the plate inside out
     const diag = Math.hypot(pw, ph);
@@ -2640,7 +3163,7 @@ addEventListener('resize', resize);
 
 const uF = {};
 ['uMode', 'uCount', 'uGeom', 'uRms', 'uProf', 'uOrigin', 'uPlate', 'uInner',
- 'uScale', 'uField', 'uPal', 'uDrive', 'uShowDrive', 'uBg', 'uFinger', 'uFingerN', 'uRot']
+ 'uScale', 'uField', 'uPal', 'uDrive', 'uShowDrive', 'uBg', 'uFinger', 'uFingerN', 'uRot', 'uPoly', 'uSides']
   .forEach(k => uF[k] = gl.getUniformLocation(progField, k));
 const fingerBuf = new Float32Array(8);
 const uP = {};
@@ -2648,7 +3171,7 @@ const uP = {};
 const uB = {};
 ['uTex', 'uAlpha'].forEach(k => uB[k] = gl.getUniformLocation(progBlit, k));
 
-const GEOM_ID = { rect: 0, disc: 1, ring: 1, tri: 2 };
+const GEOM_ID = { rect: 0, disc: 1, ring: 1, tri: 2, pent: 3, hex: 3, hept: 3, oct: 3 };
 
 /* ================================================================
    smooth & liquid styles — the field drawn directly, no particles
@@ -2662,9 +3185,12 @@ const GEOM_ID = { rect: 0, disc: 1, ring: 1, tri: 2 };
    ================================================================ */
 
 let style = 'grains', smoothSub = 'lines', liqMat = 'gloss', showNodes = true;
+let liqForm = 'contours', liqBase = 'plate';
 const STYLE_KEYS = ['grains', 'smooth', 'liquid'];
 const SUB_KEYS = ['lines', 'density', 'contours'];
 const LMAT_KEYS = ['gloss', 'water'];
+const LFORM_KEYS = ['nodes', 'contours'];
+const LBASE_KEYS = ['plate', 'pool'];
 
 // shared glsl: profile lookup, palettes and the per-geometry mode shape
 const GLSL_COMMON = `
@@ -2672,8 +3198,11 @@ const float PI = 3.14159265359;
 const float TAU3 = 2.09439510239;
 const int PROF_W = ${PROF_W};
 uniform sampler2D uProf;
+uniform highp sampler2DArray uPoly;
 uniform int uGeom;
+uniform int uSides;
 uniform float uInner;
+${GLSL_POLY}
 float prof(int row, float s) {
   float t = clamp(s, 0.0, 1.0) * float(PROF_W - 1);
   int i = int(floor(t));
@@ -2695,6 +3224,7 @@ float modeShape(vec4 m, vec2 q, float s, float th) {
     }
     return acc;
   }
+  if (uGeom == 3) return textureLod(uPoly, vec3(q, m.x), 0.0).r;
   return prof(int(m.x), q.x) * prof(int(m.y), q.y);
 }`;
 
@@ -2702,6 +3232,7 @@ float modeShape(vec4 m, vec2 q, float s, float th) {
 const FRAG_RMS = `#version 300 es
 precision highp float;
 precision highp sampler2D;
+precision highp sampler2DArray;
 out vec4 fragColor;
 uniform vec4  uMode[${MAXMODES}];
 uniform int   uCount;
@@ -2760,6 +3291,7 @@ void main() {
 const FRAG_STYLE = `#version 300 es
 precision highp float;
 precision highp sampler2D;
+precision highp sampler2DArray;
 out vec4 fragColor;
 uniform sampler2D uOld, uNew;
 uniform float uBlend;
@@ -2780,6 +3312,8 @@ uniform float uPlateOp, uContourOp;   // contours: the sheet over the canvas, th
 uniform int   uNodes;                 // contours: draw the nodal lines among them
 uniform float uTime, uMotion;         // liquid: elapsed seconds, and how much it moves
 uniform float uPhase;                 // liquid: the drive's phase at the slowed motion rate
+uniform int   uLForm;                 // liquid: 0 in the nodal channels, 1 along the contours
+uniform int   uLBase;                 // liquid: 0 on the bare plate, 1 over a film covering it
 uniform vec2  uLight;       // key light direction on screen
 uniform vec2  uDrive;
 uniform int   uShowDrive;
@@ -2849,17 +3383,31 @@ vec2 flowQ(vec2 q) {
                 cos(q.x * 8.0 - tt * 1.1) + 0.5 * cos(q.y * 13.0 + tt * 0.7));
   return q + w * uMotion * 0.004;
 }
+/* along the contours the same parabola is taken across each contour line
+   instead: the distance to the nearest level, in levels, against a half-width
+   the fill sets. the nodal lines are level zero, so they bead too. */
+const float FILM = 0.12;                // the flooded base, as a fraction of a crest
 float heightRaw(vec2 q) {
-  float sh = shore() * (1.0 + 0.18 * uMotion * sin(uPhase));
-  float u = fldL(flowQ(q)) / sh;
+  float breathe = 1.0 + 0.18 * uMotion * sin(uPhase);
+  float u;
+  if (uLForm == 1) {
+    float x = fldL(flowQ(q)) * uLevels;
+    u = abs(fract(x + 0.5) - 0.5) / (mix(0.06, 0.42, uFill) * breathe);
+  } else {
+    u = fldL(flowQ(q)) / (shore() * breathe);
+  }
   float h = 1.0 - u * u;
-  if (uMotion > 0.0 && h > 0.0) {
+  // over a film the pool's own surface carries the ripples too
+  float wr = uLBase == 1 ? max(h, 0.0) + FILM : h;
+  if (uMotion > 0.0 && wr > 0.0) {
     vec2 p = q * uPlate / uSide * 120.0;
     float r = sin(p.x * 0.8 + p.y * 0.6 - uTime * 2.3)
             + sin(-p.x * 0.5 + p.y * 0.9 - uTime * 1.7)
             + 0.6 * sin(p.x * 1.3 - p.y * 0.4 + uTime * 2.9);
-    h += uMotion * 0.06 * h * r;
+    h += uMotion * 0.06 * wr * r;
   }
+  // flooded: the beads rise out of a film that covers the whole plate
+  if (uLBase == 1) h = FILM + (1.0 - FILM) * max(h, 0.0);
   return h;
 }
 
@@ -2899,6 +3447,8 @@ void main() {
     inside = r <= 1.0 && r >= uInner;
   } else if (uGeom == 2) {
     inside = q.x >= 0.0 && q.x <= 1.0 && q.y >= 0.0 && q.y <= 2.0 * q.x && q.y <= 2.0 - 2.0 * q.x;
+  } else if (uGeom == 3) {
+    inside = polyInside(q);
   } else {
     inside = q.x >= 0.0 && q.x <= 1.0 && q.y >= 0.0 && q.y <= 1.0;
   }
@@ -2958,7 +3508,7 @@ void main() {
     float spec = pow(max(dot(N, normalize(L + V)), 0.0), 110.0);
 
     float w = max(fwidth(hr), 1e-4) * 0.8;
-    float cover = smoothstep(-w, w, hr);
+    float cover = uLBase == 1 ? 1.0 : smoothstep(-w, w, hr);
 
     // the beads throw a soft shadow away from the key light
     vec2 lp = vec2(cr * uLight.x + sr * uLight.y, -sr * uLight.x + cr * uLight.y);
@@ -2967,14 +3517,16 @@ void main() {
 
     vec3 plateCol = plateSurface(q);
     plateCol *= 1.0 - shadow * (1.0 - cover);
+    // under a flood the beads still shade the sheet below, through the liquid
+    float shadeUnder = uLBase == 1 ? 1.0 - 0.35 * smoothstep(FILM, 0.6, heightRaw(q - off)) * (1.0 - smoothstep(FILM, 0.6, h)) : 1.0;
 
     vec3 liq;
     if (uMat == 0) {
       float diff = max(dot(N, L), 0.0);
-      liq = uTint * (0.14 + 0.78 * diff) + env(R) * fres * 0.9 + vec3(spec * 1.3);
+      liq = uTint * (0.14 + 0.78 * diff) * shadeUnder + env(R) * fres * 0.9 + vec3(spec * 1.3);
     } else {
       vec2 qr = q + N.xy * uDepth * 0.025 * h;            // refraction through the bead
-      vec3 under = plateSurface(qr);
+      vec3 under = plateSurface(qr) * shadeUnder;
       float lap = hxp + hxm + hyp + hym - 4.0 * h;
       float caustic = clamp(-lap * 6.0, 0.0, 1.0);
       liq = under * vec3(0.82, 0.93, 1.0) + vec3(0.55, 0.8, 1.0) * caustic * 0.35
@@ -3007,12 +3559,13 @@ function uniformsOf(prog, names) {
   return o;
 }
 const uR = uniformsOf(progRms, ['uMode', 'uCount', 'uNH', 'uAmp', 'uNorm', 'uSize', 'uEnc', 'uProf', 'uGeom', 'uInner',
-  'uLineN', 'uLinePh']);
+  'uLineN', 'uLinePh', 'uPoly', 'uSides']);
 const uM = uniformsOf(progMix, ['uOld', 'uNew', 'uT', 'uSize']);
 const uS = uniformsOf(progStyle, ['uOld', 'uNew', 'uBlend', 'uEnc', 'uTexel', 'uOrigin', 'uPlate', 'uSide', 'uRot',
   'uStyle', 'uMat', 'uPal', 'uBg', 'uTint', 'uLineW', 'uSoft', 'uLevels', 'uFill', 'uDepth', 'uLight',
   'uContour', 'uNode', 'uPlateCol', 'uGridCol', 'uGrid', 'uPlateOp', 'uContourOp', 'uNodes', 'uTime', 'uMotion', 'uPhase',
-  'uDrive', 'uShowDrive', 'uFinger', 'uFingerN', 'uProf', 'uGeom', 'uInner']);
+  'uLForm', 'uLBase',
+  'uDrive', 'uShowDrive', 'uFinger', 'uFingerN', 'uProf', 'uGeom', 'uInner', 'uPoly', 'uSides']);
 
 // a float render target when the browser has one; otherwise 8 bits, sqrt-encoded
 const floatRT = !!gl.getExtension('EXT_color_buffer_float');
@@ -3102,6 +3655,7 @@ const CG = 24;
 function insidePlate(x, y) {
   if (geom === 'disc' || geom === 'ring') { const r = Math.hypot(x * 2 - 1, y * 2 - 1); return r <= 1 && r >= ringInner(); }
   if (geom === 'tri') return y >= 0 && y <= 2 * x && y <= 2 - 2 * x;
+  if (polySides()) return polyInside(polySides(), x, y);
   return true;
 }
 let lineN = 0, linePh = [1, 0];
@@ -3218,6 +3772,7 @@ function drawStyled(dt, bg) {
     gl.uniform1i(uR.uEnc, fieldEnc);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texAmp);  gl.uniform1i(uR.uAmp, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texProf); gl.uniform1i(uR.uProf, 1);
+    bindPoly(5); gl.uniform1i(uR.uPoly, 5); gl.uniform1i(uR.uSides, polySides());
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     fieldDirty = false;
     if (!fieldValid) { fieldValid = true; blend = 1; }
@@ -3232,6 +3787,7 @@ function drawStyled(dt, bg) {
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fieldTex[fOld]); gl.uniform1i(uS.uOld, 0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fieldTex[fNew]); gl.uniform1i(uS.uNew, 1);
   gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texProf);       gl.uniform1i(uS.uProf, 2);
+  bindPoly(5); gl.uniform1i(uS.uPoly, 5); gl.uniform1i(uS.uSides, polySides());
   gl.uniform1f(uS.uBlend, blend);
   gl.uniform1i(uS.uEnc, fieldEnc);
   gl.uniform2f(uS.uTexel, 1 / fieldN, 1 / fieldN);
@@ -3243,6 +3799,8 @@ function drawStyled(dt, bg) {
   gl.uniform1f(uS.uInner, ringInner());
   gl.uniform1i(uS.uStyle, style === 'liquid' ? 3 : SUB_KEYS.indexOf(smoothSub));
   gl.uniform1i(uS.uMat, LMAT_KEYS.indexOf(liqMat));
+  gl.uniform1i(uS.uLForm, LFORM_KEYS.indexOf(liqForm));
+  gl.uniform1i(uS.uLBase, LBASE_KEYS.indexOf(liqBase));
   gl.uniform1i(uS.uPal, palette);
   gl.uniform3f(uS.uBg, bg[0], bg[1], bg[2]);
   const tc = coarseRgb();
@@ -3286,21 +3844,26 @@ function updateStyleUI() {
   });
   disp_(byId('smoothsub'), style === 'smooth');
   disp_(byId('liquidmat'), style === 'liquid');
+  disp_(byId('liquidform'), style === 'liquid');
+  disp_(byId('liquidbase'), style === 'liquid');
   const sm = style === 'smooth', lq = style === 'liquid';
+  const lqc = lq && liqForm === 'contours';
   const ct = sm && smoothSub === 'contours';
   disp_(byId('contourcols'), ct);
   disp_(byId('noderow'), ct);
   disp_(byId('lbl-node'), showNodes);
   disp_(byId('platecols'), lq || ct);
   disp_(byId('lbl-grid'), lq);
-  const show = { morph: !grains, linew: sm && smoothSub !== 'density', soft: (sm && smoothSub === 'density') || lq,
-                 levels: ct, copac: ct, popac: ct, lfill: lq, depth: lq, light: lq, pgrid: lq, lmotion: lq };
+  const show = { morph: !grains, linew: sm && smoothSub !== 'density', soft: (sm && smoothSub === 'density') || (lq && !lqc),
+                 levels: ct || lqc, copac: ct, popac: ct, lfill: lq, depth: lq, light: lq, pgrid: lq, lmotion: lq };
   Object.keys(show).forEach(k => disp_(byId('param-' + k), show[k]));
   document.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === style));
   document.querySelectorAll('[data-sub]').forEach(b => b.classList.toggle('active', b.dataset.sub === smoothSub));
   document.querySelectorAll('[data-lmat]').forEach(b => b.classList.toggle('active', b.dataset.lmat === liqMat));
+  document.querySelectorAll('[data-lform]').forEach(b => b.classList.toggle('active', b.dataset.lform === liqForm));
+  document.querySelectorAll('[data-lbase]').forEach(b => b.classList.toggle('active', b.dataset.lbase === liqBase));
   const tag = byId('style-tag');
-  if (tag) tag.textContent = grains ? '' : sm ? smoothSub : liqMat;
+  if (tag) tag.textContent = grains ? '' : sm ? smoothSub : liqMat + ' · ' + (liqForm === 'contours' ? 'contours' : 'nodes');
 }
 function setStyle(s) {
   if (!STYLE_KEYS.includes(s)) return;
@@ -3310,9 +3873,13 @@ function setStyle(s) {
 }
 function setSmoothSub(s) { if (SUB_KEYS.includes(s)) { smoothSub = s; updateStyleUI(); } }
 function setLiqMat(m) { if (LMAT_KEYS.includes(m)) { liqMat = m; updateStyleUI(); } }
+function setLiqForm(f) { if (LFORM_KEYS.includes(f)) { liqForm = f; updateStyleUI(); } }
+function setLiqBase(b) { if (LBASE_KEYS.includes(b)) { liqBase = b; updateStyleUI(); } }
 document.querySelectorAll('[data-style]').forEach(b => b.addEventListener('click', () => setStyle(b.dataset.style)));
 document.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => setSmoothSub(b.dataset.sub)));
 document.querySelectorAll('[data-lmat]').forEach(b => b.addEventListener('click', () => setLiqMat(b.dataset.lmat)));
+document.querySelectorAll('[data-lform]').forEach(b => b.addEventListener('click', () => setLiqForm(b.dataset.lform)));
+document.querySelectorAll('[data-lbase]').forEach(b => b.addEventListener('click', () => setLiqBase(b.dataset.lbase)));
 function setShowNodes(v) {
   showNodes = !!v;
   const b = document.getElementById('btn-nodes');
@@ -3375,6 +3942,7 @@ function frame(now) {
   gl.uniform1i(uF.uGeom, GEOM_ID[geom]);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texRms);  gl.uniform1i(uF.uRms, 0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texProf); gl.uniform1i(uF.uProf, 1);
+  bindPoly(5); gl.uniform1i(uF.uPoly, 5); gl.uniform1i(uF.uSides, polySides());
   gl.uniform2f(uF.uOrigin, origin[0], origin[1]);
   gl.uniform2f(uF.uPlate, plate[0], plate[1]);
   gl.uniform1f(uF.uInner, ringInner());
@@ -3876,9 +4444,10 @@ function queueSolve() {
   });
 }
 
-const GEOM_LABEL = { rect: 'rect', disc: 'disc', ring: 'ring', tri: 'tri' };
+const GEOM_LABEL = { rect: 'rect', disc: 'disc', ring: 'ring', tri: 'tri', pent: 'pentagon', hex: 'hexagon', hept: 'heptagon', oct: 'octagon' };
 function updateTags() {
-  document.getElementById('plate-tag').textContent = GEOM_LABEL[geom] + ' · ' + edge;
+  document.getElementById('plate-tag').textContent = GEOM_LABEL[geom] + ' · ' +
+    (polySides() && !polyCache.has(polySides()) ? 'solving…' : edge);
   document.getElementById('drive-tag').textContent = spec.length + 'p · ' + fmtHz(P.freq * hzPerUnit());
   document.getElementById('mode-tag').textContent = active.length + ' active';
   document.getElementById('grain-tag').textContent = medium + (momentary ? ' · hold' : '');
@@ -3942,7 +4511,8 @@ function updateModeList() {
   _mlAt = now;
   const el = document.getElementById('modelist');
   if (!active.length) {
-    if (_mlHtml !== '') { _mlHtml = ''; el.innerHTML = '<span>no modes excited</span>'; }
+    const msg = polySides() && !polyCache.has(polySides()) ? 'solving the polygon\'s modes…' : 'no modes excited';
+    if (_mlHtml !== msg) { _mlHtml = msg; el.innerHTML = '<span>' + msg + '</span>'; }
     return;
   }
   const top = active.slice(0, 14), peak = top[0].tot || 1;
@@ -4076,14 +4646,32 @@ function pointerToPlate(e) {
   const rx = cr * ox + sr * oy, ry = -sr * ox + cr * oy;
   return [(rx + plate[0] / 2) / side, (ry + plate[1] / 2) / side];
 }
+// a touch screen has no shift key: holding still on the plate places a finger
+// instead, and the driver goes back to where it was before the touch
+let pressTimer = 0, pressFrom = null;
+function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = 0; } }
 canvas.addEventListener('pointerdown', e => {
   const [x, y] = pointerToPlate(e);
   if (x < -0.1 || x > 1.1 || y < -0.1 || y > 1.1) return;
-  if (e.shiftKey) { toggleFinger(Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))); return; }
+  const cx = Math.min(1, Math.max(0, x)), cy = Math.min(1, Math.max(0, y));
+  if (e.shiftKey) { toggleFinger(cx, cy); return; }
+  cancelPress();
+  if (e.pointerType === 'touch') {
+    const before = [PB.dx, PB.dy];
+    pressFrom = [e.clientX, e.clientY];
+    pressTimer = setTimeout(() => {
+      pressTimer = 0;
+      if (!dragging) return;
+      releasePlate();
+      setParam('dx', before[0]); setParam('dy', before[1]);
+      toggleFinger(cx, cy);
+      if (navigator.vibrate) navigator.vibrate(12);
+    }, 550);
+  }
   dragging = true; canvas.setPointerCapture(e.pointerId);
   pointerHeld = true; setHeld();
-  setParam('dx', Math.min(1, Math.max(0, x)));
-  setParam('dy', Math.min(1, Math.max(0, y)));
+  setParam('dx', cx);
+  setParam('dy', cy);
 });
 
 function toggleFinger(x, y) {
@@ -4100,12 +4688,13 @@ document.getElementById('btn-clearfingers').addEventListener('click', () => {
   fingers = []; queueSolve(); updateTags();
 });
 canvas.addEventListener('pointermove', e => {
+  if (pressTimer && Math.hypot(e.clientX - pressFrom[0], e.clientY - pressFrom[1]) > 10) cancelPress();
   if (!dragging) return;
   const [x, y] = pointerToPlate(e);
   setParam('dx', Math.min(1, Math.max(0, x)));
   setParam('dy', Math.min(1, Math.max(0, y)));
 });
-function releasePlate() { dragging = false; pointerHeld = false; setHeld(); }
+function releasePlate() { cancelPress(); dragging = false; pointerHeld = false; setHeld(); }
 canvas.addEventListener('pointerup', e => { releasePlate(); canvas.releasePointerCapture(e.pointerId); });
 canvas.addEventListener('pointercancel', releasePlate);
 canvas.addEventListener('lostpointercapture', releasePlate);
@@ -4409,7 +4998,7 @@ function snapshotPatch() {
     drive:  { waveform, snap: snapOn, fitRange },
     grains: { medium, evenFeed, momentary },
     render: { field: fieldMode, palette, grains: showGrains, driver: showDrive, canvas: colCanvas,
-              style, smooth: smoothSub, liquid: liqMat, nodes: showNodes,
+              style, smooth: smoothSub, liquid: liqMat, liquidForm: liqForm, liquidBase: liqBase, nodes: showNodes,
               contourCol: colContour, nodeCol: colNode, plateCol: colPlate, gridCol: colGrid,
               specTop },
     audio:  { realHz },
@@ -4492,6 +5081,9 @@ function applyPatch(s) {
   setSmoothSub(SUB_KEYS.includes(rn.smooth) ? rn.smooth : 'lines');
   // chrome is gone; a patch that used it comes back as gloss
   setLiqMat(LMAT_KEYS.includes(rn.liquid) ? rn.liquid : 'gloss');
+  // patches from before the contour liquid filled the nodal channels
+  setLiqForm(LFORM_KEYS.includes(rn.liquidForm) ? rn.liquidForm : 'nodes');
+  setLiqBase(LBASE_KEYS.includes(rn.liquidBase) ? rn.liquidBase : 'plate');
   setShowNodes(rn.nodes !== false);
   setStyle(STYLE_KEYS.includes(rn.style) ? rn.style : 'grains');
   if (MED_KEYS.includes(gr.medium)) setMedium(gr.medium);
@@ -4606,7 +5198,7 @@ Object.keys(paramById).forEach(id => {
 });
 /* stepped targets: a 0–127 sweep walks a list of discrete settings. each one
    rebuilds the mode catalogue, so they only fire when the index actually moves. */
-const GEOM_STEPS = ['rect', 'disc', 'ring', 'tri'];
+const GEOM_STEPS = ['rect', 'disc', 'ring', 'tri', 'pent', 'hex', 'hept', 'oct'];
 const EDGE_STEPS = ['free', 'supported', 'clamped', 'mixed'];
 const DISP_STEPS = ['plate', 'membrane'];
 
@@ -5371,7 +5963,15 @@ function exportSvg() {
   let shape;
   if (geom === 'rect') shape = '<rect width="' + r2(pw) + '" height="' + r2(ph) + '"/>';
   else if (geom === 'tri') shape = '<path d="M0 0L' + r2(pw) + ' 0L' + r2(pw / 2) + ' ' + r2(ph) + 'Z"/>';
-  else {
+  else if (polySides()) {
+    const N = polySides(), th0 = -Math.PI / 2 - Math.PI / N;
+    let d = '';
+    for (let j = 0; j < N; j++) {
+      const a = th0 + TAU * j / N;
+      d += (j ? 'L' : 'M') + r2((0.5 + 0.5 * Math.cos(a)) * pw) + ' ' + r2((0.5 + 0.5 * Math.sin(a)) * ph);
+    }
+    shape = '<path d="' + d + 'Z"/>';
+  } else {
     const R = pw / 2, ri = ringInner() * R;
     const circ = r => 'M' + r2(R - r) + ' ' + r2(R) + 'a' + r2(r) + ' ' + r2(r) + ' 0 1 0 ' + r2(2 * r) + ' 0a' + r2(r) + ' ' + r2(r) + ' 0 1 0 ' + r2(-2 * r) + ' 0Z';
     shape = '<path fill-rule="evenodd" d="' + circ(R) + (ri > 0 ? circ(ri) : '') + '"/>';
