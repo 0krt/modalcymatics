@@ -990,9 +990,10 @@
         the plate beneath. <b>liquid motion</b> sets the liquid moving: the shores breathe with the
         plate's slowed oscillation and ripples run along the channels. at zero it lies still.
         <b>viscosity</b> thickens it: the figure it follows is blurred, so fine detail and sharp
-        corners run together, and each bead's edge becomes a gradient into the plate instead of a
-        line. <b>edge fade</b> blends the plate into the canvas toward its outline, so the shape
-        has no hard rim against the background.
+        corners run together into broad, rounded beads; at the top only the coarse shape of the
+        figure survives. <b>edge softness</b> sets how gradually each bead meets what it stands on —
+        the bare plate, or the film under <b>base: liquid</b>: at zero the outline is a crisp line,
+        higher it widens into a meniscus that shades off into its surroundings.
         <b>base: liquid</b> floods the whole plate with a thin film first, so the figure stands up out of
         a pool instead of off the bare sheet. <b>plate</b> and <b>grid</b> set the colours of that
         surface, and <b>plate grid</b> the number of grid cells across it (0 turns the grid off).<br><br>
@@ -2182,8 +2183,8 @@ const STYLE_PARAMS = [
   { id: 'lmotion', label: 'liquid motion', min: 0,  max: 1,    step: 0.01, value: 0.5,  dp: 2 },
   { id: 'lfill',  label: 'fill',        min: 0,   max: 1,    step: 0.005, value: 0.5, dp: 3 },
   { id: 'depth',  label: 'depth',       min: 0.1, max: 4,    step: 0.02, value: 1,    dp: 2 },
-  { id: 'lvisc',  label: 'viscosity',   min: 0,   max: 1,    step: 0.01, value: 0.35, dp: 2 },
-  { id: 'lfade',  label: 'edge fade',   min: 0,   max: 1,    step: 0.01, value: 0,    dp: 2 },
+  { id: 'lvisc',  label: 'viscosity',   min: 0,   max: 1,    step: 0.01, value: 0.5,  dp: 2 },
+  { id: 'lsoft',  label: 'edge softness', min: 0, max: 1,    step: 0.01, value: 0.5,  dp: 2 },
   { id: 'light',  label: 'light angle', min: 0,   max: 360,  step: 1,    value: 125,  dp: 0, unit: '°' },
   { id: 'pgrid',  label: 'plate grid',  min: 0,   max: 48,   step: 1,    value: 18,   dp: 0,
     fmt: v => v < 1 ? 'off' : v + ' cells' },
@@ -3324,6 +3325,32 @@ void main() {
   fragColor = vec4(mix(texture(uOld, q).rg, texture(uNew, q).rg, uT), 0.0, 1.0);
 }`;
 
+/* viscosity: a separable gaussian over the field, run as two passes (across,
+   then down) between the field solve and the picture. the first pass also
+   resolves the cross-fade, so the liquid reads one already-blended texture. */
+const FRAG_BLUR = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+uniform sampler2D uOld, uNew;
+uniform float uT;
+uniform vec2  uSize, uDir;    // uDir: one texel along the pass's axis
+uniform float uSigma;         // in texels
+uniform int   uRad;
+void main() {
+  vec2 q = gl_FragCoord.xy / uSize;
+  float k = -0.5 / (uSigma * uSigma);
+  vec2 acc = vec2(0.0);
+  float wsum = 0.0;
+  for (int i = -48; i <= 48; i++) {
+    if (i < -uRad || i > uRad) continue;
+    float w = exp(k * float(i * i));
+    vec2 p = q + uDir * float(i);
+    acc += w * mix(texture(uOld, p).rg, texture(uNew, p).rg, uT);
+    wsum += w;
+  }
+  fragColor = vec4(acc / wsum, 0.0, 1.0);
+}`;
+
 // pass 2: the picture
 const FRAG_STYLE = `#version 300 es
 precision highp float;
@@ -3351,8 +3378,7 @@ uniform float uTime, uMotion;         // liquid: elapsed seconds, and how much i
 uniform float uPhase;                 // liquid: the drive's phase at the slowed motion rate
 uniform int   uLForm;                 // liquid: 0 in the nodal channels, 1 along the contours
 uniform int   uLBase;                 // liquid: 0 on the bare plate, 1 over a film covering it
-uniform float uVisc;                  // liquid: 0 runny, 1 thick — blurs the figure and softens the shores
-uniform float uFade;                  // liquid: px over which the plate fades into the canvas at its rim
+uniform float uLSoft;                 // liquid: 0 crisp, 1 soft — how gradually a bead meets the plate or the film
 uniform vec2  uLight;       // key light direction on screen
 uniform vec2  uDrive;
 uniform int   uShowDrive;
@@ -3403,43 +3429,13 @@ float fldL(vec2 q) {
   float v = mix(cubicR(uOld, q).x, cubicR(uNew, q).x, uBlend);
   return uEnc == 1 ? 2.0 * v * v : v;
 }
-/* viscosity. a thick liquid cannot hold a sharp feature: the field it follows
-   is read through a wider kernel (four taps on a turned square, up to a few
-   texels out), and the bead's foot is a smooth maximum instead of a hard
-   clamp, so it runs out into a thin meniscus rather than stopping at a line.
-   k is that meniscus's height; at zero viscosity it is a hair above a clamp. */
-float fldV(vec2 q) {
-  if (uVisc < 0.01) return fldL(q);
-  vec2 r = uTexel * (0.6 + 3.4 * uVisc);
-  vec2 a = vec2(r.x, 0.38 * r.y), b = vec2(-0.38 * r.x, r.y);
-  return 0.25 * (fldL(q + a) + fldL(q - a) + fldL(q + b) + fldL(q - b));
-}
+/* edge softness. the bead's foot is a smooth maximum instead of a hard clamp,
+   so it runs out into a meniscus rather than stopping at a line; k is that
+   meniscus's height, a hair above a clamp at zero. (viscosity is not here: it
+   blurs the field itself, in a pass of its own before this one.) */
 float smax0(float x) {
-  float k = 0.015 + 0.3 * uVisc;
+  float k = 0.015 + 0.8 * uLSoft;
   return x > 0.0 ? x + k * log(1.0 + exp(-x / k)) : k * log(1.0 + exp(x / k));
-}
-// px from the plate's outline, positive inside
-float edgeD(vec2 p, vec2 a, vec2 b) { vec2 e = normalize(b - a); return dot(p - a, vec2(-e.y, e.x)); }
-float rimDist(vec2 q) {
-  vec2 p = q * uPlate, c = p - 0.5 * uPlate;
-  if (uGeom == 1) {
-    float R = 0.5 * uPlate.x, r = length(c);
-    return uInner > 0.0 ? min(R - r, r - uInner * R) : R - r;
-  }
-  if (uGeom == 2) {
-    vec2 A = vec2(0.0), B = vec2(uPlate.x, 0.0), C = vec2(0.5 * uPlate.x, uPlate.y);
-    return min(min(edgeD(p, A, B), edgeD(p, B, C)), edgeD(p, C, A));
-  }
-  if (uGeom == 3) {
-    float n = float(uSides), ap = cos(PI / n) * 0.5 * uPlate.x, d = 1e9;
-    for (int j = 0; j < 8; j++) {
-      if (j >= uSides) break;
-      float a = -0.5 * PI + 2.0 * PI * float(j) / n;
-      d = min(d, ap - dot(c, vec2(cos(a), sin(a))));
-    }
-    return d;
-  }
-  return min(min(p.x, uPlate.x - p.x), min(p.y, uPlate.y - p.y));
 }
 /* liquid sits where the amplitude is below the shore level — the same width the
    density style's softness and fill give. across the channel the surface is a
@@ -3468,10 +3464,10 @@ float heightRaw(vec2 q) {
   float breathe = 1.0 + 0.18 * uMotion * sin(uPhase);
   float u;
   if (uLForm == 1) {
-    float x = fldV(flowQ(q)) * uLevels;
+    float x = fldL(flowQ(q)) * uLevels;
     u = abs(fract(x + 0.5) - 0.5) / (mix(0.06, 0.42, uFill) * breathe);
   } else {
-    u = fldV(flowQ(q)) / (shore() * breathe);
+    u = fldL(flowQ(q)) / (shore() * breathe);
   }
   float h = 1.0 - u * u;
   // over a film the pool's own surface carries the ripples too
@@ -3576,6 +3572,10 @@ void main() {
     vec2 sl = vec2(hx, hy) * hs;
     float sm = length(sl);
     if (sm > 6.0) sl *= 6.0 / sm;
+    // toward its foot a soft bead's surface lies down into whatever it stands
+    // on, so its outline is a gradient in the shading, not a crease
+    float foot = uLBase == 1 ? FILM : 0.0;
+    sl *= smoothstep(foot, foot + 0.05 + 0.95 * uLSoft, h);
     vec3 N = normalize(vec3(-sl, 1.0));
     N.xy = vec2(cr * N.x - sr * N.y, sr * N.x + cr * N.y);  // plate frame → screen
     vec3 V = vec3(0.0, 0.0, 1.0);
@@ -3586,7 +3586,7 @@ void main() {
 
     float w = max(fwidth(hr), 1e-4) * 0.8;
     // a viscous bead's edge is a gradient into the plate, not a line
-    float cover = uLBase == 1 ? 1.0 : smoothstep(-w - 0.9 * uVisc, w + 0.25 * uVisc, hr);
+    float cover = uLBase == 1 ? 1.0 : smoothstep(-w - 4.0 * uLSoft, w + 0.5 * uLSoft, hr);
 
     // the beads throw a soft shadow away from the key light
     vec2 lp = vec2(cr * uLight.x + sr * uLight.y, -sr * uLight.x + cr * uLight.y);
@@ -3611,8 +3611,6 @@ void main() {
           + env(R) * fres + vec3(spec * 1.5);
     }
     col = mix(plateCol, liq, cover);
-    // and the whole sheet fades into the canvas toward its outline
-    if (uFade > 0.0) col = mix(uBg, col, smoothstep(0.0, uFade, rimDist(q)));
   }
   if (!inside) { fragColor = vec4(uBg, 1.0); return; }
 
@@ -3633,6 +3631,7 @@ void main() {
 const progRms   = program(VERT_QUAD, FRAG_RMS);
 const progMix   = program(VERT_QUAD, FRAG_MIX);
 const progStyle = program(VERT_QUAD, FRAG_STYLE);
+const progBlur  = program(VERT_QUAD, FRAG_BLUR);
 function uniformsOf(prog, names) {
   const o = {};
   names.forEach(k => o[k] = gl.getUniformLocation(prog, k));
@@ -3641,10 +3640,11 @@ function uniformsOf(prog, names) {
 const uR = uniformsOf(progRms, ['uMode', 'uCount', 'uNH', 'uAmp', 'uNorm', 'uSize', 'uEnc', 'uProf', 'uGeom', 'uInner',
   'uLineN', 'uLinePh', 'uPoly', 'uSides']);
 const uM = uniformsOf(progMix, ['uOld', 'uNew', 'uT', 'uSize']);
+const uBl = uniformsOf(progBlur, ['uOld', 'uNew', 'uT', 'uSize', 'uDir', 'uSigma', 'uRad']);
 const uS = uniformsOf(progStyle, ['uOld', 'uNew', 'uBlend', 'uEnc', 'uTexel', 'uOrigin', 'uPlate', 'uSide', 'uRot',
   'uStyle', 'uMat', 'uPal', 'uBg', 'uTint', 'uLineW', 'uSoft', 'uLevels', 'uFill', 'uDepth', 'uLight',
   'uContour', 'uNode', 'uPlateCol', 'uGridCol', 'uGrid', 'uPlateOp', 'uContourOp', 'uNodes', 'uTime', 'uMotion', 'uPhase',
-  'uLForm', 'uLBase', 'uVisc', 'uFade',
+  'uLForm', 'uLBase', 'uLSoft',
   'uDrive', 'uShowDrive', 'uFinger', 'uFingerN', 'uProf', 'uGeom', 'uInner', 'uPoly', 'uSides']);
 
 // a float render target when the browser has one; otherwise 8 bits, sqrt-encoded
@@ -3658,7 +3658,8 @@ function allocField(n) {
   fieldTex.forEach(t => gl.deleteTexture(t));
   fieldFbo.forEach(f => gl.deleteFramebuffer(f));
   fieldTex = []; fieldFbo = [];
-  for (let i = 0; i < 3; i++) {
+  // 0–2: old, new and the spare for cross-fades; 3–4: the viscosity blur's ping-pong
+  for (let i = 0; i < 5; i++) {
     const t = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, t);
     // r: rms, g: the signed standing wave the nodal lines are drawn from
@@ -3857,6 +3858,29 @@ function drawStyled(dt, bg) {
     fieldDirty = false;
     if (!fieldValid) { fieldValid = true; blend = 1; }
   }
+  // viscosity blurs what the liquid follows. sigma rises faster than the slider,
+  // so the low end stays fine-grained; at the top it is 4% of the plate
+  let srcOld = fieldTex[fOld], srcNew = fieldTex[fNew], srcBlend = blend;
+  if (style === 'liquid' && P.lvisc > 0.005) {
+    const v = P.lvisc;
+    const sigma = Math.max(0.5, (0.3 * v + 0.7 * v * v) * 0.04 * fieldN);
+    const rad = Math.min(48, Math.ceil(2.5 * sigma));
+    gl.useProgram(progBlur);
+    gl.uniform2f(uBl.uSize, fieldN, fieldN);
+    gl.uniform1f(uBl.uSigma, sigma);
+    gl.uniform1i(uBl.uRad, rad);
+    const pass = (a, b, t, dir, dst) => {
+      bindFieldPass(fieldFbo[dst]);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a); gl.uniform1i(uBl.uOld, 0);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(uBl.uNew, 1);
+      gl.uniform1f(uBl.uT, t);
+      gl.uniform2f(uBl.uDir, dir[0] / fieldN, dir[1] / fieldN);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    };
+    pass(srcOld, srcNew, blend, [1, 0], 3);
+    pass(fieldTex[3], fieldTex[3], 0, [0, 1], 4);
+    srcOld = srcNew = fieldTex[4]; srcBlend = 0;
+  }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, W, H);
   gl.enable(gl.SCISSOR_TEST);
@@ -3864,11 +3888,11 @@ function drawStyled(dt, bg) {
   // line widths keep their size relative to the plate when capturing at higher res
   const dprEff = capturing ? (H / Math.max(1, innerHeight)) : Math.min(window.devicePixelRatio || 1, 2);
   gl.useProgram(progStyle);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fieldTex[fOld]); gl.uniform1i(uS.uOld, 0);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fieldTex[fNew]); gl.uniform1i(uS.uNew, 1);
-  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texProf);       gl.uniform1i(uS.uProf, 2);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, srcOld); gl.uniform1i(uS.uOld, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, srcNew); gl.uniform1i(uS.uNew, 1);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texProf); gl.uniform1i(uS.uProf, 2);
   bindPoly(5); gl.uniform1i(uS.uPoly, 5); gl.uniform1i(uS.uSides, polySides());
-  gl.uniform1f(uS.uBlend, blend);
+  gl.uniform1f(uS.uBlend, srcBlend);
   gl.uniform1i(uS.uEnc, fieldEnc);
   gl.uniform2f(uS.uTexel, 1 / fieldN, 1 / fieldN);
   gl.uniform2f(uS.uOrigin, origin[0], origin[1]);
@@ -3881,8 +3905,7 @@ function drawStyled(dt, bg) {
   gl.uniform1i(uS.uMat, LMAT_KEYS.indexOf(liqMat));
   gl.uniform1i(uS.uLForm, LFORM_KEYS.indexOf(liqForm));
   gl.uniform1i(uS.uLBase, LBASE_KEYS.indexOf(liqBase));
-  gl.uniform1f(uS.uVisc, P.lvisc);
-  gl.uniform1f(uS.uFade, P.lfade * Math.max(1, side) * 0.25);
+  gl.uniform1f(uS.uLSoft, P.lsoft);
   gl.uniform1i(uS.uPal, palette);
   gl.uniform3f(uS.uBg, bg[0], bg[1], bg[2]);
   const tc = coarseRgb();
@@ -3937,7 +3960,7 @@ function updateStyleUI() {
   disp_(byId('platecols'), lq || ct);
   disp_(byId('lbl-grid'), lq);
   const show = { morph: !grains, linew: sm && smoothSub !== 'density', soft: (sm && smoothSub === 'density') || (lq && !lqc),
-                 levels: ct || lqc, copac: ct, popac: ct, lfill: lq, depth: lq, lvisc: lq, lfade: lq, light: lq, pgrid: lq, lmotion: lq };
+                 levels: ct || lqc, copac: ct, popac: ct, lfill: lq, depth: lq, lvisc: lq, lsoft: lq, light: lq, pgrid: lq, lmotion: lq };
   Object.keys(show).forEach(k => disp_(byId('param-' + k), show[k]));
   document.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === style));
   document.querySelectorAll('[data-sub]').forEach(b => b.classList.toggle('active', b.dataset.sub === smoothSub));
