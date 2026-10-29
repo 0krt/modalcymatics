@@ -321,7 +321,7 @@
   }
 
   /* modal spectrum readout */
-  #spectrum { width: 100%; height: 76px; display: block; margin: 4px 0 8px; }
+  #spectrum { width: 100%; height: 76px; display: block; margin: 4px 0 8px; cursor: ew-resize; touch-action: none; }
   /* the same readout as a bar across the top of the plate view */
   #spec-top {
     position: fixed; top: 62px; left: 22px; right: calc(var(--panel-w) + 22px); z-index: 5;
@@ -867,7 +867,7 @@
         <button class="tool" id="btn-snap">step through modes</button>
         <button class="tool" id="btn-fitrange">resonant range</button>
       </div>
-      <canvas role="img" aria-label="Frequency spectrum of the plate's modal response." id="spectrum"></canvas>
+      <canvas role="img" aria-label="Frequency spectrum of the plate's modal response. Drag across it to set the drive frequency." title="drag to set the frequency" id="spectrum"></canvas>
       <div class="toolrow">
         <button class="tool" id="btn-spectop">spectrum above plate</button>
       </div>
@@ -989,6 +989,10 @@
         <b>gloss</b> is a resin tinted with the sand colour, and <b>water</b> is clear and refracts
         the plate beneath. <b>liquid motion</b> sets the liquid moving: the shores breathe with the
         plate's slowed oscillation and ripples run along the channels. at zero it lies still.
+        <b>viscosity</b> thickens it: the figure it follows is blurred, so fine detail and sharp
+        corners run together, and each bead's edge becomes a gradient into the plate instead of a
+        line. <b>edge fade</b> blends the plate into the canvas toward its outline, so the shape
+        has no hard rim against the background.
         <b>base: liquid</b> floods the whole plate with a thin film first, so the figure stands up out of
         a pool instead of off the bare sheet. <b>plate</b> and <b>grid</b> set the colours of that
         surface, and <b>plate grid</b> the number of grid cells across it (0 turns the grid off).<br><br>
@@ -2066,12 +2070,40 @@ function polySample(layer, x, y) {
 }
 // inside the regular N-gon inscribed in the plate box, flat edge down; s < 1 shrinks it
 function polyInside(N, x, y, s = 1) {
-  const cx = x * 2 - 1, cy = y * 2 - 1, ap = Math.cos(Math.PI / N) * s;
-  for (let e = 0; e < N; e++) {
-    const a = -Math.PI / 2 + TAU * e / N;
-    if (cx * Math.cos(a) + cy * Math.sin(a) > ap) return false;
-  }
+  const cx = x * 2 - 1, cy = y * 2 - 1, ap = Math.cos(Math.PI / N) * s, nm = polyNormals(N);
+  for (let e = 0; e < 2 * N; e += 2) if (cx * nm[e] + cy * nm[e + 1] > ap) return false;
   return true;
+}
+// the outward edge normals (x, y interleaved), worked out once per side count —
+// every grain is tested against them every frame
+const polyNormTab = {};
+function polyNormals(N) {
+  let nm = polyNormTab[N];
+  if (!nm) {
+    nm = polyNormTab[N] = new Float64Array(2 * N);
+    for (let e = 0; e < N; e++) {
+      const a = -Math.PI / 2 + TAU * e / N;
+      nm[2 * e] = Math.cos(a); nm[2 * e + 1] = Math.sin(a);
+    }
+  }
+  return nm;
+}
+/* every mode pre-sampled at the cpu rms grid's texel centres, with the plate's
+   mask, so the field solve is a table read per mode instead of a bilinear
+   sample of the full raster. rebuilt when the uploaded polygon changes. */
+let polyGridN = 0, polyGridTab = null, polyGridMask = null;
+function ensurePolyGrid(N) {
+  if (polyGridN === N || !polyCache.has(N)) return;
+  const r = polyCache.get(N), G2 = GRID * GRID, L = r.meta.length;
+  polyGridN = 0;                       // polySample reads the current polygon's raster
+  polyGridTab = new Float32Array(L * G2);
+  polyGridMask = new Uint8Array(G2);
+  for (let gy = 0; gy < GRID; gy++) for (let gx = 0; gx < GRID; gx++) {
+    const x = (gx + 0.5) / GRID, y = (gy + 0.5) / GRID, g = gy * GRID + gx;
+    polyGridMask[g] = polyInside(N, x, y) ? 1 : 0;
+    if (polyGridMask[g]) for (let l = 0; l < L; l++) polyGridTab[l * G2 + g] = polySample(l, x, y);
+  }
+  polyGridN = N;
 }
 
 /* ================================================================
@@ -2150,6 +2182,8 @@ const STYLE_PARAMS = [
   { id: 'lmotion', label: 'liquid motion', min: 0,  max: 1,    step: 0.01, value: 0.5,  dp: 2 },
   { id: 'lfill',  label: 'fill',        min: 0,   max: 1,    step: 0.005, value: 0.5, dp: 3 },
   { id: 'depth',  label: 'depth',       min: 0.1, max: 4,    step: 0.02, value: 1,    dp: 2 },
+  { id: 'lvisc',  label: 'viscosity',   min: 0,   max: 1,    step: 0.01, value: 0.35, dp: 2 },
+  { id: 'lfade',  label: 'edge fade',   min: 0,   max: 1,    step: 0.01, value: 0,    dp: 2 },
   { id: 'light',  label: 'light angle', min: 0,   max: 360,  step: 1,    value: 125,  dp: 0, unit: '°' },
   { id: 'pgrid',  label: 'plate grid',  min: 0,   max: 48,   step: 1,    value: 18,   dp: 0,
     fmt: v => v < 1 ? 'off' : v + ' cells' },
@@ -2673,6 +2707,8 @@ function computeRms() {
 
   const W = new Float32Array(M);
   const rect = geom === 'rect', tri = geom === 'tri', sides = polySides();
+  const G2 = GRID * GRID;
+  if (sides) ensurePolyGrid(sides);
 
   // separable shapes on a rectangle — precompute the 1-d factors once per axis
   let tx = null, ty = null;
@@ -2713,8 +2749,9 @@ function computeRms() {
           W[i] = s;
         }
       } else if (sides) {
-        if (!polyInside(sides, x, y)) { rmsGrid[gy * GRID + gx] = 0; continue; }
-        for (let i = 0; i < M; i++) W[i] = polySample(A[i].p, x, y);
+        const g = gy * GRID + gx;
+        if (!polyGridMask[g]) { rmsGrid[g] = 0; continue; }
+        for (let i = 0; i < M; i++) W[i] = polyGridTab[A[i].p * G2 + g];
       } else {
         const cx = x * 2 - 1, cy = y * 2 - 1, r = Math.hypot(cx, cy);
         if (r > 1 || r < inner) { rmsGrid[gy * GRID + gx] = 0; continue; }
@@ -2954,12 +2991,12 @@ function recycleRange(lo, hi, slot, dt) {
 function confine(ix, x, y, round, tri, inner, sides) {
   if (sides) {
     // reflect back across whichever edges were crossed
-    const ap = Math.cos(Math.PI / sides) * 0.998;
+    const ap = Math.cos(Math.PI / sides) * 0.998, nm = polyNormals(sides);
     let cx = x * 2 - 1, cy = y * 2 - 1;
     for (let it = 0; it < 3; it++) {
       let out = false;
-      for (let e = 0; e < sides; e++) {
-        const a = -Math.PI / 2 + TAU * e / sides, nx = Math.cos(a), ny = Math.sin(a);
+      for (let e = 0; e < 2 * sides; e += 2) {
+        const nx = nm[e], ny = nm[e + 1];
         const d = cx * nx + cy * ny - ap;
         if (d > 0) { cx -= 2 * d * nx; cy -= 2 * d * ny; out = true; }
       }
@@ -3314,6 +3351,8 @@ uniform float uTime, uMotion;         // liquid: elapsed seconds, and how much i
 uniform float uPhase;                 // liquid: the drive's phase at the slowed motion rate
 uniform int   uLForm;                 // liquid: 0 in the nodal channels, 1 along the contours
 uniform int   uLBase;                 // liquid: 0 on the bare plate, 1 over a film covering it
+uniform float uVisc;                  // liquid: 0 runny, 1 thick — blurs the figure and softens the shores
+uniform float uFade;                  // liquid: px over which the plate fades into the canvas at its rim
 uniform vec2  uLight;       // key light direction on screen
 uniform vec2  uDrive;
 uniform int   uShowDrive;
@@ -3364,6 +3403,44 @@ float fldL(vec2 q) {
   float v = mix(cubicR(uOld, q).x, cubicR(uNew, q).x, uBlend);
   return uEnc == 1 ? 2.0 * v * v : v;
 }
+/* viscosity. a thick liquid cannot hold a sharp feature: the field it follows
+   is read through a wider kernel (four taps on a turned square, up to a few
+   texels out), and the bead's foot is a smooth maximum instead of a hard
+   clamp, so it runs out into a thin meniscus rather than stopping at a line.
+   k is that meniscus's height; at zero viscosity it is a hair above a clamp. */
+float fldV(vec2 q) {
+  if (uVisc < 0.01) return fldL(q);
+  vec2 r = uTexel * (0.6 + 3.4 * uVisc);
+  vec2 a = vec2(r.x, 0.38 * r.y), b = vec2(-0.38 * r.x, r.y);
+  return 0.25 * (fldL(q + a) + fldL(q - a) + fldL(q + b) + fldL(q - b));
+}
+float smax0(float x) {
+  float k = 0.015 + 0.3 * uVisc;
+  return x > 0.0 ? x + k * log(1.0 + exp(-x / k)) : k * log(1.0 + exp(x / k));
+}
+// px from the plate's outline, positive inside
+float edgeD(vec2 p, vec2 a, vec2 b) { vec2 e = normalize(b - a); return dot(p - a, vec2(-e.y, e.x)); }
+float rimDist(vec2 q) {
+  vec2 p = q * uPlate, c = p - 0.5 * uPlate;
+  if (uGeom == 1) {
+    float R = 0.5 * uPlate.x, r = length(c);
+    return uInner > 0.0 ? min(R - r, r - uInner * R) : R - r;
+  }
+  if (uGeom == 2) {
+    vec2 A = vec2(0.0), B = vec2(uPlate.x, 0.0), C = vec2(0.5 * uPlate.x, uPlate.y);
+    return min(min(edgeD(p, A, B), edgeD(p, B, C)), edgeD(p, C, A));
+  }
+  if (uGeom == 3) {
+    float n = float(uSides), ap = cos(PI / n) * 0.5 * uPlate.x, d = 1e9;
+    for (int j = 0; j < 8; j++) {
+      if (j >= uSides) break;
+      float a = -0.5 * PI + 2.0 * PI * float(j) / n;
+      d = min(d, ap - dot(c, vec2(cos(a), sin(a))));
+    }
+    return d;
+  }
+  return min(min(p.x, uPlate.x - p.x), min(p.y, uPlate.y - p.y));
+}
 /* liquid sits where the amplitude is below the shore level — the same width the
    density style's softness and fill give. across the channel the surface is a
    parabola in the field, 1 on the crest and 0 at the shore: the rms is smooth in
@@ -3391,14 +3468,14 @@ float heightRaw(vec2 q) {
   float breathe = 1.0 + 0.18 * uMotion * sin(uPhase);
   float u;
   if (uLForm == 1) {
-    float x = fldL(flowQ(q)) * uLevels;
+    float x = fldV(flowQ(q)) * uLevels;
     u = abs(fract(x + 0.5) - 0.5) / (mix(0.06, 0.42, uFill) * breathe);
   } else {
-    u = fldL(flowQ(q)) / (shore() * breathe);
+    u = fldV(flowQ(q)) / (shore() * breathe);
   }
   float h = 1.0 - u * u;
   // over a film the pool's own surface carries the ripples too
-  float wr = uLBase == 1 ? max(h, 0.0) + FILM : h;
+  float wr = uLBase == 1 ? smax0(h) + FILM : h;
   if (uMotion > 0.0 && wr > 0.0) {
     vec2 p = q * uPlate / uSide * 120.0;
     float r = sin(p.x * 0.8 + p.y * 0.6 - uTime * 2.3)
@@ -3407,7 +3484,7 @@ float heightRaw(vec2 q) {
     h += uMotion * 0.06 * wr * r;
   }
   // flooded: the beads rise out of a film that covers the whole plate
-  if (uLBase == 1) h = FILM + (1.0 - FILM) * max(h, 0.0);
+  if (uLBase == 1) h = FILM + (1.0 - FILM) * smax0(h);
   return h;
 }
 
@@ -3490,9 +3567,9 @@ void main() {
     // ---- liquid ----
     vec2 dx = vec2(uTexel.x, 0.0), dy = vec2(0.0, uTexel.y);
     float hr = heightRaw(q);
-    float h  = max(hr, 0.0);
-    float hxp = max(heightRaw(q + dx), 0.0), hxm = max(heightRaw(q - dx), 0.0);
-    float hyp = max(heightRaw(q + dy), 0.0), hym = max(heightRaw(q - dy), 0.0);
+    float h  = smax0(hr);
+    float hxp = smax0(heightRaw(q + dx)), hxm = smax0(heightRaw(q - dx));
+    float hyp = smax0(heightRaw(q + dy)), hym = smax0(heightRaw(q - dy));
     float hx = (hxp - hxm) / (2.0 * dx.x * uPlate.x);
     float hy = (hyp - hym) / (2.0 * dy.y * uPlate.y);
     float hs = uDepth * uSide * 0.012;                   // crest height in pixels
@@ -3508,7 +3585,8 @@ void main() {
     float spec = pow(max(dot(N, normalize(L + V)), 0.0), 110.0);
 
     float w = max(fwidth(hr), 1e-4) * 0.8;
-    float cover = uLBase == 1 ? 1.0 : smoothstep(-w, w, hr);
+    // a viscous bead's edge is a gradient into the plate, not a line
+    float cover = uLBase == 1 ? 1.0 : smoothstep(-w - 0.9 * uVisc, w + 0.25 * uVisc, hr);
 
     // the beads throw a soft shadow away from the key light
     vec2 lp = vec2(cr * uLight.x + sr * uLight.y, -sr * uLight.x + cr * uLight.y);
@@ -3533,6 +3611,8 @@ void main() {
           + env(R) * fres + vec3(spec * 1.5);
     }
     col = mix(plateCol, liq, cover);
+    // and the whole sheet fades into the canvas toward its outline
+    if (uFade > 0.0) col = mix(uBg, col, smoothstep(0.0, uFade, rimDist(q)));
   }
   if (!inside) { fragColor = vec4(uBg, 1.0); return; }
 
@@ -3564,7 +3644,7 @@ const uM = uniformsOf(progMix, ['uOld', 'uNew', 'uT', 'uSize']);
 const uS = uniformsOf(progStyle, ['uOld', 'uNew', 'uBlend', 'uEnc', 'uTexel', 'uOrigin', 'uPlate', 'uSide', 'uRot',
   'uStyle', 'uMat', 'uPal', 'uBg', 'uTint', 'uLineW', 'uSoft', 'uLevels', 'uFill', 'uDepth', 'uLight',
   'uContour', 'uNode', 'uPlateCol', 'uGridCol', 'uGrid', 'uPlateOp', 'uContourOp', 'uNodes', 'uTime', 'uMotion', 'uPhase',
-  'uLForm', 'uLBase',
+  'uLForm', 'uLBase', 'uVisc', 'uFade',
   'uDrive', 'uShowDrive', 'uFinger', 'uFingerN', 'uProf', 'uGeom', 'uInner', 'uPoly', 'uSides']);
 
 // a float render target when the browser has one; otherwise 8 bits, sqrt-encoded
@@ -3801,6 +3881,8 @@ function drawStyled(dt, bg) {
   gl.uniform1i(uS.uMat, LMAT_KEYS.indexOf(liqMat));
   gl.uniform1i(uS.uLForm, LFORM_KEYS.indexOf(liqForm));
   gl.uniform1i(uS.uLBase, LBASE_KEYS.indexOf(liqBase));
+  gl.uniform1f(uS.uVisc, P.lvisc);
+  gl.uniform1f(uS.uFade, P.lfade * Math.max(1, side) * 0.25);
   gl.uniform1i(uS.uPal, palette);
   gl.uniform3f(uS.uBg, bg[0], bg[1], bg[2]);
   const tc = coarseRgb();
@@ -3855,7 +3937,7 @@ function updateStyleUI() {
   disp_(byId('platecols'), lq || ct);
   disp_(byId('lbl-grid'), lq);
   const show = { morph: !grains, linew: sm && smoothSub !== 'density', soft: (sm && smoothSub === 'density') || (lq && !lqc),
-                 levels: ct || lqc, copac: ct, popac: ct, lfill: lq, depth: lq, light: lq, pgrid: lq, lmotion: lq };
+                 levels: ct || lqc, copac: ct, popac: ct, lfill: lq, depth: lq, lvisc: lq, lfade: lq, light: lq, pgrid: lq, lmotion: lq };
   Object.keys(show).forEach(k => disp_(byId('param-' + k), show[k]));
   document.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === style));
   document.querySelectorAll('[data-sub]').forEach(b => b.classList.toggle('active', b.dataset.sub === smoothSub));
@@ -4538,6 +4620,7 @@ document.getElementById('modelist').addEventListener('click', e => {
 /* ---- spectrum readout ---- */
 const specCv = document.getElementById('spectrum');
 const sctx = specCv.getContext('2d');
+let specDrag = null, specFmax = 1;    // a drag on the strip, and the axis it was drawn with
 /* the readout can sit in the drive section or in a bar across the top of the
    plate view. it is the same canvas either way, moved between the two; the
    plate is fitted below the bar the same way it is fitted above the dock. */
@@ -4567,8 +4650,12 @@ function drawSpectrum() {
   sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   sctx.clearRect(0, 0, w, h);
 
-  // the axis spans the slider's reach, so a fitted range fills the strip
-  const fmax = Math.max(freqBounds()[1], P.freq * (spec.length ? spec[spec.length - 1].n : 1) * 1.1);
+  // the axis spans the slider's reach, so a fitted range fills the strip. it
+  // also stretches to show the top partial — except mid-drag, where a moving
+  // axis would slide the frequency out from under the pointer
+  const fmax = specDrag ? specDrag.fmax
+             : Math.max(freqBounds()[1], P.freq * (spec.length ? spec[spec.length - 1].n : 1) * 1.1);
+  specFmax = fmax;
 
   /* the plate's modes, one per rung of the ladder, so a degenerate pair is one
      mark. each gets a faint guide the full height of the strip — a partial
@@ -4619,8 +4706,30 @@ function drawSpectrum() {
   }
   sctx.fillStyle = '#9aa2b4';
   sctx.font = '10px ui-monospace, monospace';
-  sctx.fillText('partials (gold) vs. modes (blue, lit when ringing) →', 2, 11);
+  sctx.fillText('partials (gold) vs. modes (blue, lit when ringing) · drag to tune →', 2, 11);
 }
+
+/* the strip is also the frequency control: press and drag across it and the
+   drive follows the pointer on the strip's own axis — onto the ladder's rungs
+   while stepping through modes, and within the slider's reach */
+function specTune(e) {
+  const r = specCv.getBoundingClientRect();
+  const u = Math.min(1, Math.max(0, (e.clientX - r.left) / Math.max(1, r.width)));
+  const [lo, hi] = freqBounds();
+  setParam('freq', Math.min(hi, Math.max(lo, u * specDrag.fmax)));
+}
+specCv.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  specDrag = { fmax: specFmax };
+  specCv.setPointerCapture(e.pointerId);
+  specTune(e);
+});
+specCv.addEventListener('pointermove', e => { if (specDrag) specTune(e); });
+const specRelease = () => { if (!specDrag) return; specDrag = null; drawSpectrum(); };
+specCv.addEventListener('pointerup', specRelease);
+specCv.addEventListener('pointercancel', specRelease);
+specCv.addEventListener('lostpointercapture', specRelease);
 
 function drawStatus() {
   const el = document.getElementById('status');
