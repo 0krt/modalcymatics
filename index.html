@@ -1058,6 +1058,8 @@
         <b>momentary</b> makes the plate respond only while you hold it: the drive, the sound and the
         grain motion are on only while the pointer is down on the plate (or a midi note is held).
         <b>m</b> cycles through the three.<br><br>
+        on release the grains keep crawling, slowing with the envelope, and stop once the
+        release has run out.
         the <b>envelope</b> (attack, decay, sustain, release) runs off the hold. it scales the output
         level, with <b>volume</b> as its peak, and the number of grains in the figure.
         <b>fade</b>: the envelope is the share of grains on the plate. the attack sprinkles them on
@@ -2953,7 +2955,15 @@ function stepGrains(dt) {
     shakeGrains(cSplit, nCoarse, dt);
     shakeGrains(fSplit, grainCount, dt);
   }
-  if (!live) return;             // silent plate: nothing crawls
+  // released: the crawl carries on, slowing with the envelope, and stops only
+  // once the release has taken every grain off (fade) or into the spread (noise)
+  if (!live) {
+    const k = envFrom > 0 ? env / envFrom : 0;
+    if (k <= 0) return;
+    if (cSplit > 0) moveGrains(0, cSplit, -1, dt * k);
+    if (fSplit > nCoarse) moveGrains(nCoarse, fSplit, 1, dt * k);
+    return;
+  }
 
   // continuous feed: recycle grains back onto the plate oldest-first, so the
   // population keeps turning over instead of settling once and freezing
