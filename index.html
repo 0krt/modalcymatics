@@ -929,6 +929,27 @@
       </div>
     </div>
 
+    <div class="section" id="sec-eq">
+      <h2>EQ <span class="tag" id="eq-tag"></span><button class="infobtn" data-info="i-eq">i</button></h2>
+      <div class="toolrow">
+        <button class="tool active" id="btn-loud">equal loudness</button>
+      </div>
+      <div id="params-eq"></div>
+      <div class="hint" id="i-eq">
+        shapes the output only; the plate and the figure are unaffected.<br><br>
+        <b>equal loudness</b> compensates for the ear: low and very high tones sound much quieter than
+        tones around 1–4 khz at the same level. each partial is raised or lowered by the iso 226
+        40-phon contour relative to 1 khz, so a sweep through the modes sounds about equally loud.
+        <b>loudness amount</b> scales the correction (1 is the full curve), capped at 24 db. to make
+        room for it the loudest-corrected tones play at full scale at full volume and the mid range
+        plays quieter, so raise the volume if it is too soft. a limiter after the eq keeps eq boosts
+        from clipping. small speakers
+        cannot reproduce the lowest tones however much they are boosted.<br><br>
+        <b>low</b> is a shelf below 200 hz, <b>mid</b> a peak at <b>mid freq</b>, <b>high</b> a shelf above
+        4 khz, each ±18 db.
+      </div>
+    </div>
+
     <div class="section collapsed" id="sec-lfo">
       <h2>LFO <span class="tag" id="lfo-tag"></span><button class="infobtn" data-info="i-lfo">i</button></h2>
       <div class="foldbody">
@@ -1248,7 +1269,7 @@
       <h2>Keys <span class="tag"></span><button class="infobtn" data-info="i-keys">i</button></h2>
       <div class="hint open" id="i-keys">
         <b>/</b> or <b>ctrl-k</b> find any parameter — ↵ jumps to it in the panel<br>
-      <b>←→</b> frequency · <b>↑↓</b> previous / next mode · <b>1–9</b> the first nine modes<br>
+      <b>←→</b> frequency · <b>↑↓</b> previous / next mode · <b>1–9</b> the first nine modes (held: plays a momentary mode)<br>
       <b>scroll</b> frequency (drag down to lower)<br>
       <b>space</b> pause · <b>r</b> scatter grains · <b>g</b> randomize · <b>m</b> momentary mode<br>
         <b>d</b> grains · <b>f</b> field mode · <b>y</b> style · <b>s</b> png · <b>v</b> record · <b>h</b> panel<br><br>
@@ -2227,6 +2248,13 @@ const AUDIO_PARAMS = [
   { id: 'vol',    label: 'volume',         min: 0,   max: 1,  step: 0.005, value: 0.35, dp: 3 },
   { id: 'basehz', label: 'pitch per unit', min: 0.5, max: 30, step: 0.05,  value: 8,    dp: 2, unit: ' hz' },
 ];
+const EQ_PARAMS = [
+  { id: 'loud',  label: 'loudness amount', min: 0,   max: 1,    step: 0.01, value: 1,    dp: 2 },
+  { id: 'eqlo',  label: 'low',      min: -18, max: 18,   step: 0.5,  value: 0,    dp: 1, unit: ' db' },
+  { id: 'eqmid', label: 'mid',      min: -18, max: 18,   step: 0.5,  value: 0,    dp: 1, unit: ' db' },
+  { id: 'eqmf',  label: 'mid freq', min: 100, max: 8000, step: 10,   value: 1000, dp: 0, unit: ' hz' },
+  { id: 'eqhi',  label: 'high',     min: -18, max: 18,   step: 0.5,  value: 0,    dp: 1, unit: ' db' },
+];
 const MIDI_PARAMS = [
   { id: 'slew', label: 'smoothing', min: 0, max: 300, step: 1, value: 45, dp: 0, unit: ' ms' },
   // which note lands on the plate's lowest resonance; the ladder climbs a
@@ -2250,7 +2278,7 @@ const paramById = {};
 const PB = {};
 let modOffset = {};
 [PLATE_PARAMS, UNIT_PARAMS, DRIVE_PARAMS, DRIVEPT_PARAMS, GRAIN_PARAMS, ENV_PARAMS, GRAINCOL_PARAMS,
- RENDER_PARAMS, STYLE_PARAMS, AUDIO_PARAMS, MIDI_PARAMS, EXPORT_PARAMS]
+ RENDER_PARAMS, STYLE_PARAMS, AUDIO_PARAMS, EQ_PARAMS, MIDI_PARAMS, EXPORT_PARAMS]
   .forEach(list => list.forEach(d => { paramById[d.id] = d; P[d.id] = d.value; PB[d.id] = d.value; }));
 
 let geom = 'rect', edge = 'supported', disp = 'plate', waveform = 'sine', medium = 'sand';
@@ -2864,10 +2892,11 @@ let evenFeed = true;
 let momentary = 0, held = false, presence = 1, lastPresence = 1;
 let pointerHeld = false;
 const notesHeld = new Set();
+const keysHeld = new Set();          // number keys 1–9 act as a hold too
 let env = 1, envStage = 's', envFrom = 1, lastEnvG = 1;
 function gateOpen() { return !momentary || held; }
 function setHeld() {
-  const h = pointerHeld || notesHeld.size > 0;
+  const h = pointerHeld || notesHeld.size > 0 || keysHeld.size > 0;
   if (h === held) return;
   held = h;
   if (held) envStage = 'a';                  // legato: from wherever it is now
@@ -4285,7 +4314,8 @@ function updateDriveEnable() {
 const RESOLVE = new Set(['freq', 'q', 'partials', 'tilt', 'focus', 'focusq', 'dx', 'dy', 'finger']);
 const RESHAPE = new Set(['aspect', 'inner']);   // changing these rebuilds the mode catalogue
 const SPECUI  = new Set(['freq', 'q', 'partials', 'focus', 'focusq']);
-const AUDIOUI = new Set(['freq', 'basehz', 'vol']);
+const AUDIOUI = new Set(['freq', 'basehz', 'vol', 'loud']);
+const EQUI = new Set(['eqlo', 'eqmid', 'eqmf', 'eqhi']);
 const UNITSUI = new Set(['psize', 'pthick', 'pscale']);
 let solveQueued = false;
 
@@ -4324,6 +4354,7 @@ function applyMod(id, quiet) {
   if (id === 'pscale') { rescaleModes(); computeFrame(); queueSolve(); }
   if (SPECUI.has(id)) drawSpectrum();
   if (AUDIOUI.has(id)) updateAudio();
+  if (EQUI.has(id)) updateEq();
   if (UNITSUI.has(id)) updateUnits();
   if (id === 'mix') splitGrains();
   if (id === 'rotspd' || id === 'rotang') computeFrame();
@@ -5215,7 +5246,7 @@ function snapshotPatch() {
               style, smooth: smoothSub, liquid: liqMat, liquidForm: liqForm, liquidBase: liqBase, nodes: showNodes,
               contourCol: colContour, nodeCol: colNode, plateCol: colPlate, gridCol: colGrid,
               specTop },
-    audio:  { realHz },
+    audio:  { realHz, loudness: loudOn },
     frame:  { aspect: document.getElementById('aspect').value,
               capres: document.getElementById('capres').value },
     fingers: fingers.map(f => ({ x: +f.x.toFixed(5), y: +f.y.toFixed(5) })),
@@ -5284,6 +5315,7 @@ function applyPatch(s) {
   if (typeof rn.grains === 'boolean' && rn.grains !== showGrains) btnGrains.click();
   if (typeof rn.driver === 'boolean' && rn.driver !== showDrive) document.getElementById('btn-driver').click();
   if (typeof au.realHz === 'boolean' && au.realHz !== realHz) btnRealHz.click();
+  if (typeof au.loudness === 'boolean') setLoud(au.loudness);
   // snap is set directly: clicking it would re-quantise a frequency the patch
   // already stores exactly, against a catalogue that has not been rebuilt yet
   if (typeof dr.snap === 'boolean') { snapOn = dr.snap; btnSnap.classList.toggle('active', snapOn); }
@@ -5977,6 +6009,62 @@ if (!window.isSecureContext) {
    ================================================================ */
 
 let actx = null, osc = null, gainNode = null, audioOn = false;
+let eqLo = null, eqMid = null, eqHi = null, limiter = null, loudOn = true;
+
+/* equal loudness: the iso 226:2003 40-phon contour, the sound pressure a tone
+   needs to sound as loud as 40 db at 1 khz. a partial at f is raised by
+   L(f) − L(1 khz), scaled by the amount and capped, so a sweep through the
+   modes keeps an even loudness instead of vanishing at the low end. */
+const ISO_F = [20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800,
+  1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500];
+const ISO_40 = [99.85, 93.94, 88.17, 82.63, 77.78, 73.08, 68.48, 64.37, 60.59, 56.70, 53.41, 50.40,
+  47.58, 44.98, 43.05, 41.34, 40.06, 40.01, 41.82, 42.51, 39.23, 36.51, 35.61, 36.65, 40.01,
+  45.83, 51.80, 54.28, 51.49];
+const LOUD_CAP = 24;
+function loudDb(f) {
+  if (!loudOn || P.loud <= 0) return 0;
+  const lf = Math.log(Math.min(ISO_F[ISO_F.length - 1], Math.max(ISO_F[0], f)));
+  let i = 0;
+  while (i < ISO_F.length - 2 && Math.log(ISO_F[i + 1]) < lf) i++;
+  const a = Math.log(ISO_F[i]), b = Math.log(ISO_F[i + 1]);
+  const L = ISO_40[i] + (ISO_40[i + 1] - ISO_40[i]) * (lf - a) / (b - a);
+  return Math.min(LOUD_CAP, (L - 40.01) * P.loud);
+}
+const dbGain = db => Math.pow(10, db / 20);
+// the level at full volume. without the curve it is the old 0.3; with it the
+// most-boosted tone is put at full scale and everything else sits below it,
+// so the curve costs headroom in the mids instead of clipping the bass
+function loudLevel() {
+  const cap = loudOn ? LOUD_CAP * P.loud : 0;
+  const full = Math.max(0.3, Math.min(1, 0.3 * dbGain(cap)));
+  return full * dbGain(loudWeights().d0 - cap);
+}
+// the oscillator's waveform is peak-normalised, so the fundamental's
+// correction rides on the gain and the partials carry theirs relative to it
+let waveHz = 0;
+function loudWeights() {
+  const f0 = audioHz(), d0 = loudDb(f0);
+  return { d0, rel: n => dbGain(loudDb(f0 * n) - d0) };
+}
+function updateEq() {
+  if (!actx || !eqLo) return;
+  const t = actx.currentTime;
+  eqLo.gain.setTargetAtTime(P.eqlo, t, 0.02);
+  eqMid.gain.setTargetAtTime(P.eqmid, t, 0.02);
+  eqMid.frequency.setTargetAtTime(P.eqmf, t, 0.02);
+  eqHi.gain.setTargetAtTime(P.eqhi, t, 0.02);
+}
+function setLoud(on) {
+  loudOn = !!on;
+  const b = document.getElementById('btn-loud');
+  b.classList.toggle('active', loudOn);
+  const w = document.getElementById('param-loud');
+  if (w) w.classList.toggle('disabled', !loudOn);
+  const inp = document.getElementById('in-loud');
+  if (inp) inp.disabled = !loudOn;
+  buildWave(); updateAudio();
+}
+document.getElementById('btn-loud').addEventListener('click', () => setLoud(!loudOn));
 
 function audioHz() {
   // a pitch-mode note sounds at its own pitch, whatever mode the plate snapped to
@@ -5991,10 +6079,13 @@ function buildWave() {
   for (const p of spec) if (p.n > maxN) maxN = p.n;
   const N = maxN + 1;
   const real = new Float32Array(N), imag = new Float32Array(N);
+  const lw = loudWeights();
+  waveHz = audioHz();
   for (const p of spec) {
     if (p.n >= N) continue;
-    real[p.n] = p.a * Math.cos(p.ph);
-    imag[p.n] = -p.a * Math.sin(p.ph);
+    const a = p.a * lw.rel(p.n);
+    real[p.n] = a * Math.cos(p.ph);
+    imag[p.n] = -a * Math.sin(p.ph);
   }
   try { osc.setPeriodicWave(actx.createPeriodicWave(real, imag)); } catch (e) {}
 }
@@ -6004,13 +6095,15 @@ function updateAudio() {
   if (tag) tag.textContent = audioOn ? audioHz().toFixed(0) + ' hz' : '';
   if (!actx || !osc) return;
   osc.frequency.setTargetAtTime(audioHz(), actx.currentTime, 0.02);
+  // several partials: their relative corrections change with the pitch
+  if (loudOn && spec.length > 1 && Math.abs(Math.log(audioHz() / (waveHz || 1))) > 0.01) buildWave();
   updateGain();
 }
 // the volume is the ceiling; in a momentary mode the envelope rides under it
 let lastGain = -1;
 function updateGain() {
   if (!gainNode) return;
-  const g = audioOn ? P.vol * 0.3 * envLevel() : 0;
+  const g = audioOn ? P.vol * envLevel() * loudLevel() : 0;
   if (g === lastGain) return;
   lastGain = g;
   gainNode.gain.setTargetAtTime(g, actx.currentTime, momentary ? 0.008 : 0.03);
@@ -6023,7 +6116,17 @@ function toggleAudio() {
     actx = new (window.AudioContext || window.webkitAudioContext)();
     gainNode = actx.createGain();
     gainNode.gain.value = 0;
-    gainNode.connect(actx.destination);
+    // osc → gain → low shelf → mid peak → high shelf → limiter → out
+    eqLo = actx.createBiquadFilter(); eqLo.type = 'lowshelf'; eqLo.frequency.value = 200;
+    eqMid = actx.createBiquadFilter(); eqMid.type = 'peaking'; eqMid.Q.value = 0.9;
+    eqHi = actx.createBiquadFilter(); eqHi.type = 'highshelf'; eqHi.frequency.value = 4000;
+    limiter = actx.createDynamicsCompressor();
+    limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
+    limiter.attack.value = 0.002; limiter.release.value = 0.15;
+    gainNode.connect(eqLo); eqLo.connect(eqMid); eqMid.connect(eqHi); eqHi.connect(limiter);
+    limiter.connect(actx.destination);
+    eqMid.frequency.value = P.eqmf;
+    eqLo.gain.value = P.eqlo; eqMid.gain.value = P.eqmid; eqHi.gain.value = P.eqhi;
     osc = actx.createOscillator();
     osc.connect(gainNode);
     osc.frequency.value = audioHz();
@@ -6355,7 +6458,9 @@ addEventListener('keydown', e => {
   if (/^[1-9]$/.test(e.key)) {
     const lad = noteLadder();
     const f = lad[+e.key - 1];
-    if (f !== undefined) { e.preventDefault(); setParam('freq', f); }
+    if (f !== undefined) { e.preventDefault(); if (!e.repeat) setParam('freq', f); }
+    // in a momentary mode the key holds the plate, unless the pointer already is
+    if (!e.repeat) { keysHeld.add(e.key); setHeld(); }
     return;
   }
   if (k === ' ') { e.preventDefault(); btnPause.click(); }
@@ -6374,6 +6479,11 @@ addEventListener('keydown', e => {
   else if (k === 'm') setMomentary((momentary + 1) % 3);
 });
 
+addEventListener('keyup', e => {
+  if (keysHeld.delete(e.key)) setHeld();
+});
+addEventListener('blur', () => { if (keysHeld.size) { keysHeld.clear(); setHeld(); } });
+
 /* ---- boot ---- */
 buildParamRows(PLATE_PARAMS, document.getElementById('params-plate'));
 buildParamRows(UNIT_PARAMS, document.getElementById('params-units'));
@@ -6385,6 +6495,7 @@ buildParamRows(GRAINCOL_PARAMS, document.getElementById('params-graincol'));
 buildParamRows(RENDER_PARAMS, document.getElementById('params-render'));
 buildParamRows(STYLE_PARAMS, document.getElementById('params-style'));
 buildParamRows(AUDIO_PARAMS, document.getElementById('params-audio'));
+buildParamRows(EQ_PARAMS, document.getElementById('params-eq'));
 buildParamRows(MIDI_PARAMS, document.getElementById('params-midi'));
 buildParamRows(EXPORT_PARAMS, document.getElementById('params-export'));
 buildPresets();
