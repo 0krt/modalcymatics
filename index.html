@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CHLADNI // MODAL</title>
+<title>chladni // modal</title>
 <style>
   :root {
     /* contrast is quoted against the panel surface, which composites to ~#0d1015 */
@@ -680,13 +680,44 @@
     button.moderow { padding: 6px 4px; }
   }
 
+  /* ---------- intro (hidden: type "/intro") ----------
+     everything not yet unlocked carries .intro-hide while the intro runs */
+  body.intro .intro-hide,
+  body.intro .midi-btn,
+  body.intro:not(.intro-pins) .pin-btn,
+  body.intro:not(.intro-pins) #st-pop { display: none !important; }
+  body.intro:not(.intro-pins) #status .st-item { pointer-events: none; }
+  .intro-card {
+    position: fixed; top: 62px; left: 22px; z-index: 7;
+    width: min(310px, calc(100vw - 44px));
+    padding: 10px 12px 12px;
+    background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px;
+    font-family: var(--mono); font-size: 11px; color: var(--ink);
+  }
+  .intro-card .ic-top { display: flex; align-items: center; gap: 4px; color: var(--ink-dim); font-size: 10.5px; letter-spacing: 0.08em; }
+  .intro-card .ic-n { margin-right: auto; }
+  .intro-card .ic-link { background: none; border: 0; color: var(--ink-dim); font: inherit; cursor: pointer; padding: 2px 5px; }
+  .intro-card .ic-link:hover { color: var(--ink); }
+  .intro-card .ic-title { margin: 6px 0 4px; color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; }
+  .intro-card .ic-title.plain { text-transform: none; letter-spacing: 0.35em; }
+  .intro-card .ic-text { line-height: 1.55; }
+  .intro-card .ic-text kbd { font-family: var(--mono); padding: 0 3px; border: 1px solid var(--line-strong); border-radius: 2px; }
+  .intro-card .ic-swatch { display: inline-block; width: 0.9em; height: 0.9em; margin: 0 2px; vertical-align: -1px; border-radius: 2px; border: 1px solid var(--line-strong); }
+  .intro-card .ic-meter { height: 3px; margin-top: 10px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .intro-card .ic-meter i { display: block; height: 100%; width: 0; background: var(--accent-dim); transition: width 0.15s linear; }
+  .intro-card.won .ic-meter i { background: var(--accent); }
+  .intro-card .ic-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .intro-card .ic-actions button.act { flex: 1; }
+  @media (max-width: 760px) { .intro-card { left: 12px; width: calc(100vw - 24px); padding: 8px 10px 10px; } }
+  @media (prefers-reduced-motion: reduce) { .intro-card .ic-meter i { transition: none; } }
+
 </style>
 </head>
 <body>
 <canvas role="img" aria-label="Chladni figure: sand settling along the nodal lines of a vibrating plate." id="canvas"></canvas>
 
 <div id="header">
-  <h1>CHLADNI<em>&nbsp;//&nbsp;</em>MODAL</h1>
+  <h1>chladni<em>&nbsp;//&nbsp;</em>modal</h1>
   <div class="sub" id="subtitle">kirchhoff plate · modal superposition</div>
 </div>
 
@@ -1337,7 +1368,7 @@
 'use strict';
 
 /* ================================================================
-   CHLADNI // MODAL — kirchhoff plate eigenmode synthesizer
+   chladni // modal — kirchhoff plate eigenmode synthesizer
 
    the plate is treated as a bank of damped resonators. a drive
    waveform is decomposed into partials; each partial excites every
@@ -1357,7 +1388,7 @@ const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true, antialias:
 function fatal(msg) {
   const el = document.getElementById('err');
   el.style.display = 'block';
-  el.innerHTML = '<h1 style="letter-spacing:0.3em;font-size:13px">CHLADNI // MODAL</h1><p style="margin-top:20px">' + msg + '</p>';
+  el.innerHTML = '<h1 style="letter-spacing:0.3em;font-size:13px">chladni // modal</h1><p style="margin-top:20px">' + msg + '</p>';
   throw new Error(msg);
 }
 if (!gl) fatal('webgl2 is not available in this browser.');
@@ -4896,6 +4927,7 @@ function pointerToPlate(e) {
 let pressTimer = 0, pressFrom = null;
 function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = 0; } }
 canvas.addEventListener('pointerdown', e => {
+  if (introGate && introGate(e.shiftKey ? 'finger' : 'plate')) return;
   const [x, y] = pointerToPlate(e);
   if (x < -0.1 || x > 1.1 || y < -0.1 || y > 1.1) return;
   const cx = Math.min(1, Math.max(0, x)), cy = Math.min(1, Math.max(0, y));
@@ -4906,7 +4938,7 @@ canvas.addEventListener('pointerdown', e => {
     pressFrom = [e.clientX, e.clientY];
     pressTimer = setTimeout(() => {
       pressTimer = 0;
-      if (!dragging) return;
+      if (!dragging || (introGate && introGate('finger'))) return;
       releasePlate();
       setParam('dx', before[0]); setParam('dy', before[1]);
       toggleFinger(cx, cy);
@@ -5556,6 +5588,7 @@ function flashMidi() {
 
 const CC_NAMES = { 0xb0: 'CC', 0x90: 'note on', 0x80: 'note off', 0xe0: 'pitch', 0xd0: 'aftertouch' };
 function onMidiMessage(e, inputId) {
+  if (introGate && introGate('midi')) return;   // the intro's goals are for hands
   // an empty selection listens to every device
   if (midiInputId && inputId !== midiInputId) return;
   const [s, d1, d2] = e.data;
@@ -6428,6 +6461,8 @@ document.getElementById('aspect').addEventListener('change', () => { computeFram
 document.getElementById('capres').addEventListener('change', updateExportTag);
 
 /* ---- keys ---- */
+// set by the intro while it runs: (kind, key) => true when that input is still locked
+let introGate = null;
 addEventListener('keydown', e => {
   if (e.defaultPrevented) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
@@ -6441,6 +6476,7 @@ addEventListener('keydown', e => {
     nudgeParam(selectedParam, k === 'arrowup' ? 1 : -1, e.shiftKey);
     return;
   }
+  if (introGate && introGate('key', k)) return;
   // everywhere else the arrows play the frequency: ←→ moves it continuously
   // (one slider notch, ten with shift), ↑↓ walks the modes; 1–9 jump to the
   // first nine modes
@@ -7047,6 +7083,8 @@ requestAnimationFrame(frame);
   }
   function open() {
     index = buildIndex();
+    // during the intro, only what has been unlocked can be found
+    if (intro) index = index.filter(it => it.el && !it.el.closest('.intro-hide'));
     returnFocus = document.activeElement;
     psEl.hidden = false;
     psInput.value = ''; sel = 0;
@@ -7057,7 +7095,11 @@ requestAnimationFrame(frame);
     psEl.hidden = true;
     if (restore !== false && returnFocus && returnFocus.focus) try { returnFocus.focus(); } catch (e) {}
   }
-  psInput.addEventListener('input', () => { sel = 0; render(); });
+  psInput.addEventListener('input', () => {
+    const q = psInput.value.trim().toLowerCase();
+    if (!intro && (q === 'intro' || q === '/intro')) { close(false); startIntro(); return; }
+    sel = 0; render();
+  });
   psInput.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { sel = Math.min(hits.length - 1, sel + 1); mark(); e.preventDefault(); }
     else if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); mark(); e.preventDefault(); }
@@ -7125,6 +7167,434 @@ requestAnimationFrame(frame);
     });
     syncWave();
   }, 150);
+
+  /* ---- intro (hidden: type "/intro") ----
+     starts from a bare plate with every control hidden and unlocks the
+     instrument one piece per level. each level has a goal read straight off
+     the state (a resonance, a q, a shape …); reaching it and holding it for a
+     moment unlocks the next. the level and the patch are kept per browser, so
+     "/intro" again picks up where you left off. the patch, pins, lfos, folds,
+     tab, panel and audio are put back on exit. */
+  const INTRO_KEY = 'chladni.intro';
+  const INTRO_HOLD_MS = 600;
+  const INTRO_HUE = 190;
+  // values the intro leaves alone: they are about the room, not the plate
+  const INTRO_KEEP = new Set(['vol', 'bitrate', 'slew', 'notebase', 'capture', 'basehz',
+                              'loud', 'eqlo', 'eqmid', 'eqmf', 'eqhi', 'psize', 'pthick']);
+  let intro = null;   // the running intro, or null
+
+  const introLoad = () => { try { return JSON.parse(localStorage.getItem(INTRO_KEY)) || null; } catch (e) { return null; } };
+  const introClearSaved = () => { try { localStorage.removeItem(INTRO_KEY); } catch (e) {} };
+  // the intro's own patch: no lfos, midi map or pins, so resuming never touches the user's
+  function introPatch() {
+    const s = snapshotPatch();
+    delete s.lfos; delete s.midi; delete s.pins;
+    return s;
+  }
+  function introSave(active) {
+    try {
+      localStorage.setItem(INTRO_KEY, JSON.stringify({
+        level: intro.level, patch: introPatch(), active,
+        // so a reload mid-intro can put them back
+        pins: intro.orig.patch.pins || [], collapsed: intro.orig.collapsed,
+      }));
+    } catch (e) {}
+  }
+  function introSetFolds(ids) {
+    document.querySelectorAll('#panel .section[id]').forEach(sec => {
+      const c = ids.includes(sec.id);
+      sec.classList.toggle('collapsed', c);
+      const h = sec.querySelector(':scope > h2');
+      if (h) h.setAttribute('aria-expanded', String(!c));
+    });
+    saveFolds();
+  }
+  // a reload while the intro ran left its empty pins and opened sections behind
+  {
+    const r = introLoad();
+    if (r && r.active) {
+      setPins(Array.isArray(r.pins) ? r.pins : []);
+      if (Array.isArray(r.collapsed)) introSetFolds(r.collapsed);
+      r.active = false;
+      try { localStorage.setItem(INTRO_KEY, JSON.stringify(r)); } catch (e) {}
+    }
+  }
+
+  const introRow = sel => { const e = document.querySelector(sel); return e && (e.closest('.param, .midi-wrap') || e); };
+  const introRowOf = sel => { const e = document.querySelector(sel); return e && (e.closest('.midi-wrap') || e.closest('.toolrow') || e); };
+  // how close the drive sits to a resonance: 1 on one, less the further off, capped below 1
+  function introAtMode() {
+    const lad = noteLadder();
+    if (!lad.length) return { i: -1, p: 0 };
+    const i = ladderIndex(PB.freq, lad), rel = Math.abs(PB.freq - lad[i]) / lad[i];
+    return { i, p: rel < 0.008 ? 1 : Math.min(0.9, Math.max(0, 1 - rel / 0.08)) };
+  }
+  const introWave = w => {
+    const sel = document.getElementById('wave');
+    if (sel.value === w) return;
+    sel.value = w;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  const INTRO_LEVELS = [
+    { id: 'freq', title: 'Resonance',
+      text: 'A plate, shaken from below. Sand is thrown off wherever the plate moves and comes to rest on the lines that stand still. Sweep the frequency slowly until the sand snaps into a sharp figure.',
+      reveal: () => [introRow('#in-freq'), document.getElementById('paneltoggle')],
+      // start between two resonances that sit well apart, so the first figure is found, not given
+      setup() {
+        const lad = noteLadder();
+        let best = null;
+        for (let i = 1; i < lad.length && lad[i] < 40; i++) {
+          if (lad[i - 1] < 6) continue;
+          const gap = lad[i] / lad[i - 1];
+          if (!best || gap > best[2]) best = [lad[i - 1], lad[i], gap];
+        }
+        setParam('freq', best ? Math.sqrt(best[0] * best[1]) : 10);
+      },
+      check: () => { const m = introAtMode(); return m.i >= 1 ? m.p : m.p * 0.5; } },
+    { id: 'spectrum', title: 'Spectrum',
+      text: 'The strip above the plate lists every resonance as a blue tick; the gold line is the drive. Drag across the strip and land on a tick above 60.',
+      reveal: () => [document.getElementById('spec-top')],
+      check: () => PB.freq >= 60 ? 0.5 + 0.5 * introAtMode().p : 0.5 * Math.min(1, PB.freq / 60) },
+    { id: 'modes', title: 'Modes',
+      text: '<kbd>↑</kbd> <kbd>↓</kbd> step from one resonance to the next and <kbd>1</kbd>–<kbd>9</kbd> jump to the first nine. With <b>step through modes</b> on, the frequency read-out counts them. Land exactly on the 10th.',
+      reveal: () => [document.getElementById('modelist'), introRow('#btn-snap'), document.getElementById('status')],
+      check: () => {
+        const m = introAtMode();
+        if (m.i === 9 && m.p === 1) return 1;
+        return Math.min(0.9, (snapOn ? 0.3 : 0) + 0.6 * Math.max(0, 1 - Math.abs(m.i - 9) / 10) * m.p);
+      } },
+    { id: 'q', title: 'Sharpness',
+      text: 'Q is how sharply each mode answers. High, and only an exact hit draws anything; low, and neighbouring modes bleed into one another. Take it below 12 and watch the figure blur.',
+      reveal: () => [introRow('#in-q')],
+      snap: ['q'],
+      check: () => PB.q <= 12 ? 1 : Math.min(0.9, Math.max(0, (60 - PB.q) / 48)) },
+    { id: 'drivept', title: 'Where you shake it',
+      text: 'A mode with a still line through the drive point cannot be excited there. Drag on the plate to move the driver, the dot, into the exact centre and see which figures drop out.',
+      reveal: () => [introRow('#in-dx'), introRow('#in-dy')],
+      setup() { applyPreset(presets[2]); },
+      check: () => { const d = Math.hypot(PB.dx - 0.5, PB.dy - 0.5); return d < 0.015 ? 1 : Math.min(0.9, Math.max(0, 1 - d / 0.4)); } },
+    { id: 'fingers', title: 'Fingers',
+      text: 'Shift-click the plate (on a touch screen, hold still on it) to rest a finger there. Every mode that moves under a finger is damped. Place two.',
+      reveal: () => [introRow('#in-finger'), introRow('#btn-clearfingers')],
+      after() { fingers = []; queueSolve(); updateTags(); },
+      check: () => Math.min(1, fingers.length / 2) },
+    { id: 'geom', title: 'Shape',
+      text: 'Chladni’s plates were not all square. Choose the disc.',
+      reveal: () => [introRow('#geom')],
+      check: () => geom === 'disc' ? 1 : 0 },
+    { id: 'edge', title: 'Edge',
+      text: 'The rim matters as much as the shape: free lets it flap, clamped holds it flat and still. Clamp it, and every mode climbs.',
+      reveal: () => [introRowOf('[data-edge]')],
+      check: () => edge === 'clamped' ? 1 : 0 },
+    { id: 'disp', title: 'Stiffness',
+      text: 'A plate is stiff, so its modes rise as k² and spread far apart. A membrane, a drumskin, has no stiffness and rises as k. Switch to membrane and watch the spectrum close up.',
+      reveal: () => [introRowOf('[data-disp]')],
+      after() { setDisp('plate'); },
+      check: () => disp === 'membrane' ? 1 : 0 },
+    { id: 'wave', title: 'Harmonics',
+      text: 'A sine drives one frequency. A saw drives several at once; each partial excites its own modes and their figures pile up. Pick the saw, then partials up to 8.',
+      reveal: () => [document.querySelector('.wave-pick'), introRow('#in-partials'), introRow('#in-tilt')],
+      snap: ['partials', 'tilt'],
+      after() { introWave('sine'); },
+      check: () => waveform === 'sine' ? 0 : (waveform === 'saw' ? 0.5 : 0.25) + 0.5 * (PB.partials - 1) / 7 },
+    { id: 'audio', title: 'Listen',
+      text: 'The drive is a sound as well, and its pitch follows the frequency. Switch the output on.',
+      reveal: () => [introRow('#btn-audio'), introRow('#in-vol'), document.getElementById('outtoggle')],
+      check: () => audioOn ? 1 : 0 },
+    { id: 'medium', title: 'Powder',
+      text: 'Fine powder does the opposite of sand: the air over the plate carries it to where the plate moves most. Switch the medium to powder.',
+      reveal: () => [introRowOf('[data-med]')],
+      after() { setMedium('sand'); },
+      check: () => medium === 'powder' ? 1 : medium === 'both' ? 0.5 : 0 },
+    { id: 'hold', title: 'Hold',
+      text: 'Momentary turns the plate into a key: in <b>fade</b> it only sounds and holds its figure while pressed. Pick fade, then press and hold the plate.',
+      reveal: () => [introRowOf('[data-mom]'), document.getElementById('env-wrap')],
+      after() { setMomentary(0); },
+      check: () => !momentary ? 0 : held ? 1 : 0.5 },
+    { id: 'colour', title: 'Paint',
+      text: `Drawing never touches the sound. Turn the sand hue to <span class="ic-swatch" style="background:hsl(${INTRO_HUE},72%,86%)"></span>, then give the grains long trails.`,
+      reveal: () => [introRow('#in-ghue'), document.getElementById('sw-coarse').parentElement, introRow('#in-trails')],
+      check: () => {
+        const d = Math.abs(((PB.ghue - INTRO_HUE) % 360 + 540) % 360 - 180);
+        const hue = d <= 6 ? 1 : Math.min(0.9, 1 - d / 180);
+        return hue * 0.5 + Math.min(1, PB.trails / 0.6) * 0.5;
+      } },
+    { id: 'style', title: 'Other ways to see it',
+      text: 'Sand is one way to draw the figure. <b>Smooth</b> traces the still lines straight from the maths; <b>liquid</b> floods the plate. Try liquid.',
+      reveal: () => [document.getElementById('sec-style')],
+      check: () => style === 'liquid' ? 1 : style === 'smooth' ? 0.5 : 0 },
+    { id: 'presets', title: 'Presets',
+      text: 'Presets recall known figures, and randomize rolls one. <kbd>space</kbd> pauses. Load three.',
+      reveal: () => [document.getElementById('sec-presets')],
+      check: s => Math.min(1, (s.rolls || 0) / 3) },
+    { id: 'pins', title: 'Find anything',
+      text: 'Press <kbd>/</kbd> and type a name: every control is one search away. ☆ pins it under the plate. Pin one.',
+      reveal: () => [document.getElementById('findtoggle'), document.getElementById('pin-dock')],
+      check: () => pinned.length ? 1 : 0 },
+  ];
+  const introLevelOf = id => INTRO_LEVELS.findIndex(l => l.id === id);
+  // true while the intro has not yet reached the level that unlocks `id`
+  const introBlocks = id => !!intro && intro.level < introLevelOf(id);
+
+  // keyboard shortcuts, plate gestures and midi, held off until their level
+  const INTRO_KEYS = { arrowleft: null, arrowright: null, h: null, arrowup: 'modes', arrowdown: 'modes',
+                       ' ': 'presets', g: 'presets', y: 'style', m: 'hold' };
+  introGate = (kind, k) => {
+    if (!intro || intro.phase === 'end') return false;
+    if (kind === 'midi') return true;
+    if (kind === 'plate') return introBlocks('drivept');
+    if (kind === 'finger') return introBlocks('fingers');
+    if (/^[1-9]$/.test(k)) return introBlocks('modes');
+    if (!(k in INTRO_KEYS)) return true;
+    return INTRO_KEYS[k] ? introBlocks(INTRO_KEYS[k]) : false;
+  };
+
+  // outside the panel, these are hidden until a level unlocks them
+  const INTRO_OUTSIDE = ['#paneltoggle', '#outtoggle', '#findtoggle', '#pin-dock', '#spec-top', '#status'];
+  // shown whenever their parent is: what says what a group is
+  const INTRO_ALWAYS = '.tab-bar, .section > h2, .hint';
+  function introApplyVisibility() {
+    const open = intro.unlocked;
+    const inside = el => open.some(u => u === el || u.contains(el));
+    const holds = el => open.some(u => el.contains(u));
+    const walk = node => [...node.children].forEach(c => {
+      if (c.matches(INTRO_ALWAYS) || inside(c)) { c.classList.remove('intro-hide'); return; }
+      if (holds(c)) { c.classList.remove('intro-hide'); walk(c); return; }
+      c.classList.add('intro-hide');
+    });
+    walk(panelEl);
+    // a sub-heading shows when what it heads does
+    panelEl.querySelectorAll('.sublabel').forEach(l => {
+      const n = l.nextElementSibling;
+      if (n && !n.classList.contains('intro-hide') && !l.parentElement.classList.contains('intro-hide')) l.classList.remove('intro-hide');
+    });
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('intro-hide', !holds(document.getElementById('tab-' + b.dataset.tab)));
+    });
+    INTRO_OUTSIDE.forEach(sel => {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      if (inside(el)) el.classList.remove('intro-hide');
+      else if (holds(el)) { el.classList.remove('intro-hide'); walk(el); }
+      else el.classList.add('intro-hide');
+    });
+    introPlaceCard();
+  }
+  // under the spectrum bar while it shows, under the title otherwise
+  function introPlaceCard() {
+    if (!intro || !intro.card) return;
+    const st = document.getElementById('spec-top');
+    const head = document.getElementById('header').getBoundingClientRect().bottom;
+    const r = !st.hidden && !st.classList.contains('intro-hide') ? st.getBoundingClientRect() : null;
+    intro.card.style.top = Math.round((r && r.height ? r.bottom : head) + 10) + 'px';
+  }
+
+  function introCapture() {
+    return {
+      patch: snapshotPatch(), paused, audio: audioOn, tab: activeTab, plateRot,
+      collapsed: [...document.querySelectorAll('#panel .section.collapsed')].map(s => s.id),
+      panelHidden: document.body.classList.contains('panel-hidden'),
+      lfoAssigns: lfos.map(l => l.assigns),
+    };
+  }
+  const introSetPanel = hidden => {
+    if (document.body.classList.contains('panel-hidden') !== hidden) document.getElementById('paneltoggle').click();
+  };
+  function introBarePatch() {
+    lfos.forEach(l => { l.assigns = []; });   // in memory only: the saved lfos are never touched
+    const s = introPatch();
+    Object.keys(s.params).forEach(k => { if (!INTRO_KEEP.has(k)) s.params[k] = paramById[k].value; });
+    s.plate = { geom: 'rect', edge: 'free', disp: 'plate', material };
+    s.drive = { waveform: 'sine', snap: false, fitRange: false };
+    s.grains = { medium: 'sand', evenFeed: true, momentary: 0 };
+    Object.assign(s.render, { field: 0, palette: 0, grains: true, driver: true, canvas: '#0a0b0e', style: 'grains',
+                              smooth: 'lines', liquid: 'gloss', liquidForm: 'contours', liquidBase: 'plate', nodes: true,
+                              specTop: true });
+    s.audio = { realHz: false, loudness: loudOn };
+    s.frame = { aspect: '0', capres: s.frame.capres };
+    s.fingers = [];
+    applyPatch(s);
+    plateRot = 0;
+    if (paused) btnPause.click();
+    if (audioOn) toggleAudio();
+    setPins([]);
+  }
+
+  function startIntro() {
+    if (intro) return;
+    closeStatusEditor();
+    const saved = introLoad();
+    intro = { level: 0, phase: 'splash', unlocked: [], state: {}, heldSince: 0, orig: introCapture(), raf: 0, card: null, shown: -1 };
+    introBarePatch();
+    document.body.classList.add('intro');
+    introSetPanel(true);
+    intro.card = document.createElement('div');
+    intro.card.className = 'intro-card';
+    intro.card.setAttribute('role', 'region');
+    intro.card.setAttribute('aria-label', 'Intro');
+    document.body.appendChild(intro.card);
+    introApplyVisibility();
+    if (saved && saved.level > 0 && saved.level < INTRO_LEVELS.length) {
+      if (saved.patch) try { applyPatch(saved.patch); } catch (e) {}
+      introSetPanel(false);
+      introEnter(saved.level);
+    } else {
+      introCard('', 'chladni // modal', 'A plate, some sand and nothing else. The rest comes back one piece at a time.',
+                [['begin', () => { introSetPanel(false); introEnter(0); }]], false, true);
+    }
+    intro.raf = requestAnimationFrame(introTick);
+  }
+
+  function introCard(n, title, text, actions, meter, plain) {
+    const c = intro.card;
+    c.classList.remove('won');
+    c.innerHTML = '<div class="ic-top"><span class="ic-n">' + n + '</span>'
+      + (meter ? '<button type="button" class="ic-link" data-ic="skip">skip</button>' : '')
+      + '<button type="button" class="ic-link" data-ic="quit" aria-label="Leave the intro" title="Leave (esc) — progress is kept">✕</button></div>'
+      + '<div aria-live="polite"><div class="ic-title' + (plain ? ' plain' : '') + '">' + title + '</div><div class="ic-text">' + text + '</div></div>'
+      + (meter ? '<div class="ic-meter" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>' : '')
+      + (actions && actions.length ? '<div class="ic-actions"></div>' : '');
+    c.querySelector('[data-ic="quit"]').addEventListener('click', quitIntro);
+    const skip = c.querySelector('[data-ic="skip"]');
+    if (skip) skip.addEventListener('click', introComplete);
+    (actions || []).forEach(([label, fn]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'act'; b.textContent = label;
+      b.addEventListener('click', fn);
+      c.querySelector('.ic-actions').appendChild(b);
+    });
+    const first = c.querySelector('.ic-actions button');
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  function introEnter(i) {
+    const L = INTRO_LEVELS[i];
+    intro.level = i; intro.phase = 'play'; intro.state = {}; intro.heldSince = 0; intro.shown = -1;
+    if (L.setup) L.setup(intro.state);
+    intro.unlocked = INTRO_LEVELS.slice(0, i + 1).flatMap(l => (l.reveal ? l.reveal() : []).filter(Boolean));
+    document.body.classList.toggle('intro-pins', i >= introLevelOf('pins'));
+    introApplyVisibility();
+    introCard((i + 1) + ' / ' + INTRO_LEVELS.length, L.title, L.text, null, true);
+    const fresh = (L.reveal ? L.reveal() : []).filter(Boolean);
+    fresh.forEach(el => {
+      if (el.closest('#panel')) return;
+      el.classList.remove('flash-find'); void el.offsetWidth; el.classList.add('flash-find');
+      setTimeout(() => el.classList.remove('flash-find'), 1600);
+    });
+    const inPanel = fresh.find(el => el.closest('#panel'));
+    if (inPanel && !document.body.classList.contains('panel-hidden')) {
+      revealControl(inPanel);
+      // revealing moves focus into the panel; the arrow keys belong to the plate in most levels
+      if (L.id === 'modes' && document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+    introSave(true);
+  }
+
+  function introTick(now) {
+    if (!intro) return;
+    intro.raf = requestAnimationFrame(introTick);
+    if (intro.phase !== 'play') return;
+    const p = Math.max(0, Math.min(1, INTRO_LEVELS[intro.level].check(intro.state) || 0));
+    const pct = Math.round(p * 100);
+    if (pct !== intro.shown) {
+      intro.shown = pct;
+      const m = intro.card.querySelector('.ic-meter');
+      if (m) { m.firstChild.style.width = pct + '%'; m.setAttribute('aria-valuenow', pct); }
+    }
+    if (p < 1) { intro.heldSince = 0; return; }
+    if (!intro.heldSince) intro.heldSince = now;
+    else if (now - intro.heldSince >= INTRO_HOLD_MS) introComplete();
+  }
+
+  function introComplete() {
+    if (!intro || intro.phase !== 'play') return;
+    intro.phase = 'won';
+    intro.card.classList.add('won');
+    introSnap(INTRO_LEVELS[intro.level]);
+    const m = intro.card.querySelector('.ic-meter');
+    if (m) { m.firstChild.style.width = '100%'; m.setAttribute('aria-valuenow', 100); }
+    const next = intro.level + 1;
+    setTimeout(() => {
+      if (!intro || intro.phase !== 'won') return;
+      if (next < INTRO_LEVELS.length) introEnter(next);
+      else introFinale();
+    }, 900);
+  }
+
+  function introFinale() {
+    intro.level = INTRO_LEVELS.length;
+    intro.phase = 'end';
+    introClearSaved();
+    document.body.classList.remove('intro');
+    introCard('', 'All unlocked', 'Still to find on your own: real units, rendering, the EQ, LFOs, MIDI, export and video.',
+              [['keep this patch', () => introEnd(true)], ['back to mine', () => introEnd(false)]]);
+  }
+
+  function quitIntro() {
+    if (!intro) return;
+    if (intro.phase === 'end') { introEnd(false); return; }
+    introSave(false);
+    introEnd(false);
+  }
+
+  function introEnd(keepPatch) {
+    const o = intro.orig;
+    cancelAnimationFrame(intro.raf);
+    intro.card.remove();
+    intro = null;
+    document.body.classList.remove('intro', 'intro-pins');
+    document.querySelectorAll('.intro-hide').forEach(el => el.classList.remove('intro-hide'));
+    lfos.forEach((l, i) => { l.assigns = o.lfoAssigns[i] || []; });
+    // keeping the patch keeps the plate, never the intro's empty lfos, midi map or pins
+    const back = keepPatch ? Object.assign(introPatch(), { lfos: o.patch.lfos, midi: o.patch.midi, pins: o.patch.pins }) : o.patch;
+    try { applyPatch(back); } catch (e) { console.error('intro: restoring the patch failed:', e); }
+    if (!keepPatch) { plateRot = o.plateRot; computeFrame(); }
+    if (paused !== o.paused) btnPause.click();
+    if (audioOn !== o.audio) toggleAudio();
+    introSetPanel(o.panelHidden);
+    showTab(o.tab);
+    introSetFolds(o.collapsed);
+  }
+
+  // a level's own controls glide back to their defaults once it is done
+  function introSnap(L) {
+    const keys = L.snap || [];
+    const finish = () => {
+      if (!intro) return;   // left mid-glide: the exit restore owns the patch now
+      keys.forEach(k => setParam(k, paramById[k].value));
+      if (L.after) L.after();
+    };
+    const from = {};
+    const glide = keys.filter(k => PB[k] !== paramById[k].value);
+    glide.forEach(k => { from[k] = PB[k]; });
+    if (!glide.length || matchMedia('(prefers-reduced-motion: reduce)').matches) { finish(); return; }
+    const t0 = performance.now(), T = 450;
+    const step = now => {
+      if (!intro) return;
+      const u = Math.min(1, (now - t0) / T), e = u * u * (3 - 2 * u);
+      glide.forEach(k => setParam(k, from[k] + (paramById[k].value - from[k]) * e));
+      if (u < 1) requestAnimationFrame(step); else finish();
+    };
+    requestAnimationFrame(step);
+  }
+
+  // events the checks cannot read off the state
+  {
+    const ap = applyPreset;
+    applyPreset = function () {
+      const r = ap.apply(this, arguments);
+      if (intro && intro.phase === 'play' && INTRO_LEVELS[intro.level].id === 'presets') intro.state.rolls = (intro.state.rolls || 0) + 1;
+      return r;
+    };
+  }
+
+  addEventListener('keydown', e => {
+    if (!intro || e.key !== 'Escape' || e.defaultPrevented) return;
+    if (!psEl.hidden || !stPop.hidden) return;
+    quitIntro();
+  });
+  addEventListener('resize', introPlaceCard);
 
   addPinButtons();
   renderDock();
