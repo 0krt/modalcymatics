@@ -17,7 +17,9 @@ The controls are split into four tabs.
   strip that shows the drive partials against the plate's modes.
 - **Drive** — presets, waveform, audio output, an EQ with an equal-loudness
   curve, and LFOs that can modulate any mappable parameter.
-- **Sand** — grain style, count and behaviour, and rendering.
+- **Sand** — grain style, count and behaviour, rendering, and the 2d / 3d view.
+  The 3d view lays the current picture over a surface that moves with the
+  plate's displacement; drag to orbit, ctrl-scroll to zoom.
 - **Setup** — MIDI (notes and CC mapping), PNG, SVG and video export at a fixed
   frame aspect and resolution, key reference,
   and an **About** section that explains the physics.
@@ -34,11 +36,13 @@ The controls are split into four tabs.
 | `r` / `g` | scatter grains / randomize |
 | `m` | momentary mode |
 | `d` / `f` / `y` | grains / field mode / style |
+| `t` | 2d / 3d view |
 | `s` / `v` | save PNG / record video |
 | `h` | show or hide the panel |
 
 On the plate: drag to move the driver, shift-click to pin a damping finger,
-scroll to sweep the frequency. Double-click a slider to reset it, double-click
+scroll to sweep the frequency. In 3d, drag orbits the camera, alt-drag moves
+the driver, ctrl-scroll zooms and double-click resets the camera. Double-click a slider to reset it, double-click
 a readout to type a value, and use ☆ to pin a parameter under the plate.
 
 Typing `intro` in the search starts a guided introduction that unlocks the
