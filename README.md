@@ -18,8 +18,10 @@ The controls are split into four tabs.
 - **Drive** — presets, waveform, audio output, an EQ with an equal-loudness
   curve, and LFOs that can modulate any mappable parameter.
 - **Sand** — grain style, count and behaviour, rendering, and the 2d / 3d view.
-  The 3d view lays the current picture over a surface that moves with the
-  plate's displacement; drag to orbit, ctrl-scroll to zoom.
+  In 3d, smooth styles ride on a surface that moves with the plate's
+  displacement (the plate itself can be hidden, leaving only the lines), and
+  grains hop above a flat plate as high as it shakes under them. Drag to
+  orbit, ctrl-scroll to zoom, or set an auto orbit.
 - **Setup** — MIDI (notes and CC mapping), PNG, SVG and video export at a fixed
   frame aspect and resolution, key reference,
   and an **About** section that explains the physics.
